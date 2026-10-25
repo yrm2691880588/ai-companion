@@ -15,16 +15,36 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [account, setAccount] = useState<Account | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     api
       .me()
-      .then(setAccount)
+      .then((me) => {
+        setAccount(me);
+        // 没有 account_id 说明只是开发模式兜底账号，视为未登录
+        if (!me.account_id && location.pathname !== "/login") {
+          navigate("/login", { replace: true });
+        }
+      })
       .catch(() => {
         if (location.pathname !== "/login") navigate("/login", { replace: true });
-      });
+      })
+      .finally(() => setChecking(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (checking) {
+    return (
+      <div className="app">
+        <main className="main">
+          <p className="muted" style={{ marginTop: 40 }}>
+            正在检查登录状态…
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

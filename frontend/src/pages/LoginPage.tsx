@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 
 export default function LoginPage() {
-  const navigate = useNavigate();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [debugCode, setDebugCode] = useState<string | null>(null);
@@ -29,10 +28,10 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await api.login(phone.trim(), code.trim());
-      navigate("/");
+      // 整页刷新，让登录态与账号数据一起生效
+      window.location.href = "/";
     } catch (event) {
       setError((event as Error).message);
-    } finally {
       setBusy(false);
     }
   }
