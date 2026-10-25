@@ -98,13 +98,19 @@ if (-not $NoBrowser) {
     } -ArgumentList $Url | Out-Null
 }
 
-Write-Section '启动后端'
 Write-Host "打开地址：$Url" -ForegroundColor Cyan
 Write-Host '关闭本窗口即停止服务（数据库容器会保留）。' -ForegroundColor DarkGray
 Write-Host ''
 
 Push-Location (Join-Path $Root 'backend')
 try {
+    Write-Section '数据库迁移'
+    & $Python -m alembic upgrade head
+    if ($LASTEXITCODE -ne 0) {
+        throw '数据库迁移失败，请确认 companion-postgres 容器已启动。'
+    }
+
+    Write-Section '启动后端'
     & $Python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 } finally {
     Pop-Location
