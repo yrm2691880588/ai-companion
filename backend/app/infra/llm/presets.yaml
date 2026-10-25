@@ -1,0 +1,248 @@
+# 模型接入预设（种子数据）：新增供应商时优先在这里加，再由管理端导入数据库。
+# 价格单位：人民币元 / 百万 tokens，分高峰(peak)与空闲(offpeak)。
+# 未核实的价格一律填 0 并标 pricing_known: false，需在「模型与服务」页面按官网填入实价。
+version: 1
+
+providers:
+  - key: deepseek
+    name: DeepSeek 官方
+    kind: openai
+    base_url: https://api.deepseek.com
+    api_key_env: AI_COMPANION_DEEPSEEK_API_KEY
+    allow_private: false
+    thinking_style: deepseek
+    default: true
+    models:
+      - model_name: deepseek-flash
+        display_name: DeepSeek V4.1 Flash
+        context_window: 1000000
+        max_output: 384000
+        supports: [stream, json, tools, thinking, vision]
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.04, offpeak: 0.02}
+          miss: {peak: 2.0, offpeak: 1.0}
+          out: {peak: 8.0, offpeak: 4.0}
+        aliases: [deepseek-chat, deepseek-v4-flash]
+        notes: 日常闲聊默认档；非思考模式成本最低。
+      - model_name: deepseek-v4-pro
+        display_name: DeepSeek V4 Pro
+        context_window: 1000000
+        max_output: 384000
+        supports: [stream, json, tools, thinking]
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.30, offpeak: 0.15}
+          miss: {peak: 9.0, offpeak: 4.5}
+          out: {peak: 27.0, offpeak: 13.5}
+        aliases: [deepseek-reasoner, deepseek-v4-pro-0813]
+        notes: 人设生成、演练复盘等复杂任务使用；成本约为 Flash 的 4–5 倍。
+
+  - key: qwen
+    name: 通义千问（DashScope 兼容）
+    kind: openai
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key_env: AI_COMPANION_QWEN_API_KEY
+    models:
+      - model_name: qwen-plus
+        display_name: Qwen Plus
+        context_window: 131072
+        max_output: 8192
+        supports: [stream, json, tools]
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 境内已备案；价格请按官网填写。
+
+  - key: kimi
+    name: Kimi（月之暗面）
+    kind: openai
+    base_url: https://api.moonshot.cn/v1
+    api_key_env: AI_COMPANION_KIMI_API_KEY
+    models:
+      - model_name: kimi-k2
+        display_name: Kimi K2
+        context_window: 262144
+        max_output: 32768
+        supports: [stream, json, tools]
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 模型名与价格以官网为准，可在设置页修改。
+
+  - key: glm
+    name: 智谱 GLM
+    kind: openai
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    api_key_env: AI_COMPANION_GLM_API_KEY
+    models:
+      - model_name: glm-4-plus
+        display_name: GLM-4 Plus
+        context_window: 131072
+        max_output: 8192
+        supports: [stream, json, tools]
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 境内已备案；价格按官网填写。
+
+  - key: siliconflow
+    name: 硅基流动 SiliconFlow
+    kind: openai
+    base_url: https://api.siliconflow.cn/v1
+    api_key_env: AI_COMPANION_SILICONFLOW_API_KEY
+    models:
+      - model_name: deepseek-ai/DeepSeek-V3
+        display_name: DeepSeek V3（硅基流动）
+        context_window: 131072
+        max_output: 8192
+        supports: [stream, json, tools]
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 聚合平台，可同时提供聊天与 embedding。
+      - model_name: BAAI/bge-m3
+        display_name: bge-m3（embedding）
+        context_window: 8192
+        max_output: 0
+        supports: []
+        embedding_dim: 1024
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 向量模型；与本地 bge-m3 同维（1024），可互换。
+
+  - key: openai
+    name: OpenAI 官方
+    kind: openai
+    base_url: https://api.openai.com/v1
+    api_key_env: AI_COMPANION_OPENAI_API_KEY
+    models:
+      - model_name: gpt-4.1-mini
+        display_name: GPT-4.1 mini
+        context_window: 128000
+        max_output: 32768
+        supports: [stream, json, tools, vision]
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 境外服务，选择时需提示数据出境。
+      - model_name: text-embedding-3-small
+        display_name: embedding-3-small
+        context_window: 8191
+        max_output: 0
+        supports: []
+        embedding_dim: 1536
+        pricing_known: false
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 1536 维；切换到 1024 维需重建记忆索引。
+
+  - key: ollama
+    name: Ollama（本地）
+    kind: openai
+    base_url: http://localhost:11434/v1
+    allow_private: true
+    models:
+      - model_name: qwen2.5:7b-instruct
+        display_name: Qwen2.5 7B（本地）
+        context_window: 32768
+        max_output: 4096
+        supports: [stream, json, tools]
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 本机推理，无 API 费用；适合离线与隐私场景。
+      - model_name: bge-m3
+        display_name: bge-m3（本地 embedding）
+        context_window: 8192
+        max_output: 0
+        supports: []
+        embedding_dim: 1024
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 默认 embedding；1024 维，与 pgvector 列一致。
+
+  - key: lmstudio
+    name: LM Studio（本地）
+    kind: openai
+    base_url: http://localhost:1234/v1
+    allow_private: true
+    models:
+      - model_name: local-model
+        display_name: LM Studio 本地模型
+        context_window: 32768
+        max_output: 8192
+        supports: [stream, json]
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: 模型名以 LM Studio 里加载的为准，可在设置页改。
+
+  - key: vllm
+    name: vLLM / SGLang（自部署）
+    kind: openai
+    base_url: http://localhost:8000/v1
+    allow_private: true
+    models:
+      - model_name: local-model
+        display_name: 自部署模型
+        context_window: 32768
+        max_output: 8192
+        supports: [stream, json, tools]
+        pricing_known: true
+        pricing:
+          hit: {peak: 0.0, offpeak: 0.0}
+          miss: {peak: 0.0, offpeak: 0.0}
+          out: {peak: 0.0, offpeak: 0.0}
+        notes: OpenAI 兼容；窗口与模型名按部署实际填写。
+
+routes:
+  chat_main:
+    chain:
+      - {model: "deepseek:deepseek-flash", temperature: 0.8, max_tokens: 512, thinking: false}
+      - {model: "siliconflow:deepseek-ai/DeepSeek-V3", temperature: 0.8, max_tokens: 512}
+      - {model: "ollama:qwen2.5:7b-instruct", temperature: 0.8, max_tokens: 512}
+  persona_generate:
+    chain:
+      - {model: "deepseek:deepseek-v4-pro", temperature: 0.6, max_tokens: 1200, json_mode: true}
+      - {model: "deepseek:deepseek-flash", temperature: 0.6, max_tokens: 1200, json_mode: true}
+  memory_extract:
+    chain:
+      - {model: "deepseek:deepseek-flash", temperature: 0.0, max_tokens: 800, json_mode: true}
+      - {model: "ollama:qwen2.5:7b-instruct", temperature: 0.0, max_tokens: 800, json_mode: true}
+  summarize:
+    chain:
+      - {model: "deepseek:deepseek-flash", temperature: 0.2, max_tokens: 800}
+      - {model: "ollama:qwen2.5:7b-instruct", temperature: 0.2, max_tokens: 800}
+  safety_check:
+    chain:
+      - {model: "deepseek:deepseek-flash", temperature: 0.0, max_tokens: 200, json_mode: true}
+  roleplay_review:
+    chain:
+      - {model: "deepseek:deepseek-v4-pro", temperature: 0.4, max_tokens: 1600, json_mode: true}
+      - {model: "deepseek:deepseek-flash", temperature: 0.4, max_tokens: 1600, json_mode: true}
+  title_generate:
+    chain:
+      - {model: "deepseek:deepseek-flash", temperature: 0.3, max_tokens: 40}

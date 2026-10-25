@@ -1,0 +1,27 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# 本地配置与密钥
+.env
+.env.*
+!.env.example
+*.local
+
+# Node / 前端
+node_modules/
+frontend/**/dist/
+frontend/**/.vite/
+
+# 临时文件与日志
+.tmp/
+tmp/
+*.log
+
+# 编辑器
+.vscode/
+.idea/

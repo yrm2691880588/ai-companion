@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg16}
+    container_name: companion-postgres
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: companion
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d companion"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: companion-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: companion-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: companion-api
+    environment:
+      AI_COMPANION_ENV: dev
+      AI_COMPANION_DATABASE_URL: postgresql+asyncpg://app:app@postgres:5432/companion
+      AI_COMPANION_REDIS_URL: redis://redis:6379/0
+      AI_COMPANION_MASTER_KEY: ${AI_COMPANION_MASTER_KEY:-}
+      AI_COMPANION_ALLOW_PRIVATE_MODEL_ENDPOINTS: "true"
+      AI_COMPANION_DEEPSEEK_API_KEY: ${AI_COMPANION_DEEPSEEK_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend:/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  web:
+    image: ${NODE_IMAGE:-node:20-alpine}
+    container_name: companion-web
+    working_dir: /app
+    environment:
+      VITE_API_TARGET: http://api:8000
+    ports:
+      - "5273:5273"
+    volumes:
+      - ../frontend:/app
+    command: ["sh", "-c", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0"]
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
