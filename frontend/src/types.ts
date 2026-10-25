@@ -69,6 +69,14 @@ export interface Summary {
   updated_at?: string | null;
 }
 
+export interface Latest {
+  session_id?: number | null;
+  message_id?: number | null;
+  role?: "user" | "assistant" | null;
+  content?: string | null;
+  created_at?: string | null;
+}
+
 export interface Scenario {
   key: string;
   title: string;

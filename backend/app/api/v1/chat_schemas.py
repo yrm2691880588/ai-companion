@@ -39,3 +39,11 @@ class SummaryOut(BaseModel):
     summary: str | None = None
     covered_seq: int = 0
     updated_at: datetime | None = None
+
+
+class LatestOut(BaseModel):
+    session_id: int | None = None
+    message_id: int | None = None
+    role: str | None = None
+    content: str | None = None
+    created_at: datetime | None = None

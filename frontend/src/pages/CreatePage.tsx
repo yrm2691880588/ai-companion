@@ -94,7 +94,7 @@ export default function CreatePage() {
           />
           <div className="toolbar">
             <button className="primary" disabled={busy} onClick={() => void generate()}>
-              {busy ? "生成中…" : "生成人设"}
+              {busy ? "生成中…" : persona ? "换一版" : "生成人设"}
             </button>
           </div>
         </div>

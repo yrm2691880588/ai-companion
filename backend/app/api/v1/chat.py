@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_chat_service, get_current_user_id, get_summary_repo
 from app.api.v1.chat_schemas import (
+    LatestOut,
     MessageOut,
     SendMessageIn,
     SessionCreateIn,
@@ -124,6 +125,36 @@ async def list_messages(
 ) -> list[MessageOut]:
     records = await service.list_messages(user_id, session_id, before_seq=before_seq, limit=limit)
     return [_message_out(item) for item in records]
+
+
+@router.post("/sessions/{session_id}/opener", response_model=MessageOut)
+async def open_session(
+    session_id: int,
+    request: Request,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[ChatService, Depends(get_chat_service)],
+) -> MessageOut:
+    """空会话的第一句由伴侣先开口；已有消息时原样返回第一条。"""
+    message = await service.open_session(user_id, session_id, request_id(request))
+    return _message_out(message)
+
+
+@router.get("/companions/{companion_id}/latest", response_model=LatestOut)
+async def latest_message(
+    companion_id: int,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[ChatService, Depends(get_chat_service)],
+) -> LatestOut:
+    message = await service.latest_message(user_id, companion_id)
+    if message is None:
+        return LatestOut()
+    return LatestOut(
+        session_id=message.session_id,
+        message_id=message.id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
+    )
 
 
 @router.post("/sessions/{session_id}/messages")

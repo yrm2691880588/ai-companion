@@ -3,6 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { Companion, Memory } from "../types";
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days < 1) return "今天";
+  if (days < 30) return `${days} 天前`;
+  const date = new Date(iso);
+  return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`;
+}
+
 export default function MemoryPage() {
   const { id } = useParams();
   const companionId = Number(id);
@@ -57,8 +66,8 @@ export default function MemoryPage() {
     <div>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
-          <h1>记忆</h1>
-          <p className="muted">{companion ? `${companion.name} 记住了什么` : "加载中…"}</p>
+          <h1>她记得的事</h1>
+          <p className="muted">{companion ? `${companion.name} 记住的关于你的事` : "加载中…"}</p>
         </div>
         <div className="toolbar">
           <Link className="btn ghost" to={`/companions/${companionId}/chat`}>
@@ -72,7 +81,9 @@ export default function MemoryPage() {
 
       {error && <div className="alert">{error}</div>}
       {!enabled && (
-        <div className="notice">记忆已关闭：不会自动抽取，也不会在对话里调用已有记忆。</div>
+        <div className="notice">
+          记忆已关闭：不会自动抽取新记忆，也不会在对话里调用已有记忆；已经记住的内容仍然保留。
+        </div>
       )}
 
       {loading ? (
@@ -87,9 +98,11 @@ export default function MemoryPage() {
           {items.map((memory) => (
             <div className="card" key={memory.id}>
               <span className="chip">{memory.type_label}</span>
-              <p style={{ margin: "8px 0", lineHeight: 1.6 }}>{memory.content}</p>
-              {memory.quote && <p className="muted">来源：「{memory.quote}」</p>}
-              <p className="muted">置信度 {Math.round(memory.confidence * 100)}%</p>
+              <p style={{ margin: "8px 0", lineHeight: 1.6 }}>她记得：{memory.content}</p>
+              {memory.quote && <p className="muted">你曾说过：「{memory.quote}」</p>}
+              <p className="muted">
+                {memory.confidence >= 0.8 ? "确定" : "大概"} · {relativeTime(memory.created_at)}
+              </p>
               <div className="toolbar">
                 <button className="danger" onClick={() => void remove(memory)}>
                   删除

@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from app.core.errors import AppError, InvalidInput, NotFound
 from app.domain.companions import CompanionRecord, CompanionService, LLMClient
@@ -39,6 +40,34 @@ SAFETY_NOTE = """
 - 不提供医疗、法律、投资等专业结论；需要时建议找专业人士。
 - 拒绝色情、暴力、违法内容，但保持角色口吻，不要切换成客服腔。
 """
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+OPENERS_NOTE = """
+# 现在由你先开口
+这是你们第一次对话。请用你（角色）的方式主动说第一句，1–2 句：
+- 结合当前时间（{time_hint}）自然打招呼；
+- 可以提到你正在做的事或你的身份，但不要像简历一样罗列；
+- 不要用“有什么可以帮你”这类客服话术，也不要说“我是 AI”；
+- 只输出你要说的话，不要解释。
+"""
+
+
+def time_hint(now: datetime) -> str:
+    hour = now.hour
+    if 5 <= hour < 9:
+        part = "清晨"
+    elif 9 <= hour < 12:
+        part = "上午"
+    elif 12 <= hour < 14:
+        part = "中午"
+    elif 14 <= hour < 18:
+        part = "下午"
+    elif 18 <= hour < 22:
+        part = "晚上"
+    else:
+        part = "深夜"
+    return f"{now.month} 月 {now.day} 日 {part} {now.hour:02d}:{now.minute:02d}"
 
 
 @dataclass(slots=True)
@@ -75,6 +104,10 @@ class ChatRepository(Protocol):
     async def list_messages(
         self, user_id: str, session_id: int, *, before_seq: int | None = None, limit: int = 20
     ) -> list[MessageRecord]: ...
+
+    async def latest_for_companion(
+        self, user_id: str, companion_id: int
+    ) -> MessageRecord | None: ...
 
     async def append_message(
         self,
@@ -149,6 +182,17 @@ class InMemoryChatRepository:
         if before_seq is not None:
             items = [item for item in items if item.seq < before_seq]
         return sorted(items, key=lambda item: item.seq)[-limit:]
+
+    async def latest_for_companion(self, user_id: str, companion_id: int) -> MessageRecord | None:
+        latest: MessageRecord | None = None
+        for session_id, items in self.messages.items():
+            session = await self.get_session(user_id, session_id)
+            if session is None or session.companion_id != companion_id:
+                continue
+            for item in items:
+                if latest is None or item.id > latest.id:
+                    latest = item
+        return latest
 
     async def append_message(
         self,
@@ -321,6 +365,46 @@ class ChatService:
     async def delete_session(self, user_id: str, session_id: int) -> None:
         await self.get_session(user_id, session_id)
         await self._repo.delete_session(user_id, session_id)
+
+    async def latest_message(self, user_id: str, companion_id: int) -> MessageRecord | None:
+        await self._companions.get(user_id, companion_id)
+        return await self._repo.latest_for_companion(user_id, companion_id)
+
+    async def open_session(self, user_id: str, session_id: int, request_id: str) -> MessageRecord:
+        """她先开口：仅对空会话生成一次开场白，失败用模板兜底。"""
+        session = await self.get_session(user_id, session_id)
+        existing = await self._repo.list_messages(user_id, session_id, limit=1)
+        if existing:
+            return existing[0]
+        companion = await self._companions.get(user_id, session.companion_id)
+        now = datetime.now(SHANGHAI)
+        prompt = companion.compiled_prompt + OPENERS_NOTE.format(time_hint=time_hint(now))
+        messages = self._build_messages(prompt, []) + [
+            Message(role=Role.USER, content="（现在由你先开口。）")
+        ]
+        collected = ""
+        try:
+            async for chunk in self._streamer.stream(
+                TaskName.CHAT_MAIN,
+                messages,
+                context=CallContext(
+                    user_id=user_id, request_id=request_id, task=TaskName.CHAT_MAIN
+                ),
+            ):
+                if chunk.delta:
+                    collected += chunk.delta
+        except Exception:
+            collected = ""
+        text = collected.strip() or self._fallback_opener(companion)
+        message = await self._repo.append_message(user_id, session.id, "assistant", text)
+        await self._repo.touch_session(user_id, session.id, title=session.title or "初次见面")
+        return message
+
+    def _fallback_opener(self, companion: CompanionRecord) -> str:
+        openers = companion.persona.example_openers or []
+        if openers:
+            return openers[0]
+        return "我在呢，今天过得怎么样？"
 
     def _build_messages(self, system_prompt: str, history: list[MessageRecord]) -> list[Message]:
         messages = [Message(role=Role.SYSTEM, content=system_prompt)]

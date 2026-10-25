@@ -1,7 +1,39 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
 import type { Companion, Message, Quota, Session } from "../types";
+
+const STICK_THRESHOLD = 80;
+
+function dayKey(iso: string): string {
+  return new Date(iso).toDateString();
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayLabel(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === now.toDateString()) return "今天";
+  if (date.toDateString() === yesterday.toDateString()) return "昨天";
+  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} 天前`;
+  return dayLabel(iso);
+}
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -12,10 +44,15 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [openerLoading, setOpenerLoading] = useState(false);
+  const [showJump, setShowJump] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [quota, setQuota] = useState<Quota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const stickRef = useRef(true);
 
   useEffect(() => {
     void (async () => {
@@ -36,12 +73,36 @@ export default function ChatPage() {
   }, [companionId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
+    if (!stickRef.current) return;
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, streaming, openerLoading]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 1500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   async function selectSession(id: number) {
     setSessionId(id);
-    setMessages(await api.messages(id));
+    setError("");
+    setShowJump(false);
+    stickRef.current = true;
+    const list = await api.messages(id);
+    setMessages(list);
+    if (list.length === 0) {
+      setOpenerLoading(true);
+      try {
+        const opener = await api.openSession(id);
+        setMessages([opener]);
+        setSessions(await api.sessions(companionId));
+      } catch (event) {
+        setError((event as Error).message);
+      } finally {
+        setOpenerLoading(false);
+      }
+    }
   }
 
   async function newSession() {
@@ -58,6 +119,7 @@ export default function ChatPage() {
     const text = draft.trim();
     if (!text || !sessionId || streaming) return;
     setDraft("");
+    if (composerRef.current) composerRef.current.style.height = "auto";
     setError("");
     const tempUserId = -Date.now();
     const tempAssistantId = tempUserId - 1;
@@ -73,7 +135,7 @@ export default function ChatPage() {
     try {
       await streamEvents(
         `/v1/sessions/${sessionId}/messages`,
-        { content: text },
+        { content: text, client_request_id: crypto.randomUUID?.() ?? `${Date.now()}` },
         {
           onDelta: (delta) =>
             setMessages((prev) =>
@@ -151,6 +213,38 @@ export default function ChatPage() {
     }
   }
 
+  async function copy(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setNotice("已复制");
+    } catch {
+      setNotice("复制失败，请手动选择文字");
+    }
+  }
+
+  function onScroll() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickRef.current = distance < STICK_THRESHOLD;
+    setShowJump(distance >= STICK_THRESHOLD);
+  }
+
+  function scrollToLatest() {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    stickRef.current = true;
+    setShowJump(false);
+  }
+
+  function autoGrow() {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }
+
   const lastAssistantId = [...messages].reverse().find((item) => item.role === "assistant")?.id;
 
   return (
@@ -159,7 +253,9 @@ export default function ChatPage() {
         <div>
           <h1>{companion ? companion.name : "对话"}</h1>
           <p className="muted">
-            {companion ? `${companion.persona.identity} · 人设 v${companion.current_version}` : "加载中…"}
+            {companion
+              ? `${companion.persona.relationship || companion.persona.identity} · 人设 v${companion.current_version}`
+              : "加载中…"}
           </p>
           {quota &&
             (quota.enforced ? (
@@ -181,6 +277,7 @@ export default function ChatPage() {
       </div>
 
       {error && <div className="alert">{error}</div>}
+      {notice && <div className="toast">{notice}</div>}
       {quota?.enforced && quota.remaining <= 0 && (
         <div className="notice">今天的额度用完了，明天再来聊吧。</div>
       )}
@@ -197,40 +294,76 @@ export default function ChatPage() {
                 className={`session-item ${item.id === sessionId ? "active" : ""}`}
                 onClick={() => void selectSession(item.id)}
               >
-                {item.title || "未命名会话"}
+                <span className="session-title">{item.title || "未命名会话"}</span>
+                <span className="session-time">
+                  {relativeTime(item.last_message_at || item.created_at)}
+                </span>
               </button>
             ))}
           </div>
         </aside>
 
-        <section>
-          <div className="messages">
-            {messages.map((item) => (
-              <div key={item.id} className={`bubble ${item.role}`}>
-                {item.content || (streaming ? "…" : "")}
-                {item.role === "assistant" && item.id === lastAssistantId && !streaming && (
-                  <div style={{ marginTop: 6 }}>
-                    <button
-                      className="ghost"
-                      style={{ fontSize: 12, padding: "2px 8px" }}
-                      onClick={() => void regenerate(item.id)}
-                    >
-                      重新生成
-                    </button>
+        <section className="chat-panel">
+          <div className="messages" ref={scrollerRef} onScroll={onScroll}>
+            {messages.map((item, index) => {
+              const prev = messages[index - 1];
+              const newDay = !prev || dayKey(prev.created_at) !== dayKey(item.created_at);
+              return (
+                <Fragment key={item.id}>
+                  {newDay && (
+                    <div className="date-divider">
+                      <span>{dayLabel(item.created_at)}</span>
+                    </div>
+                  )}
+                  <div className={`bubble ${item.role}`}>
+                    <div className="bubble-content">
+                      {item.content || (streaming ? "…" : "")}
+                    </div>
+                    <div className="bubble-meta">
+                      <span>{formatTime(item.created_at)}</span>
+                      <button className="link" onClick={() => void copy(item.content)}>
+                        复制
+                      </button>
+                      {item.role === "assistant" && item.id === lastAssistantId && !streaming && (
+                        <button className="link" onClick={() => void regenerate(item.id)}>
+                          重新生成
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
+                </Fragment>
+              );
+            })}
+            {openerLoading && (
+              <div className="bubble assistant typing">她正在想怎么跟你打招呼…</div>
+            )}
+            {!openerLoading && messages.length === 0 && sessionId && (
+              <div className="empty-chat">
+                <p>新会话已经建好了。</p>
+                <p className="muted">她应该马上就会开口，稍等一下。</p>
               </div>
-            ))}
-            <div ref={bottomRef} />
+            )}
           </div>
+
+          {showJump && (
+            <button className="jump-latest" onClick={scrollToLatest}>
+              回到最新 ↓
+            </button>
+          )}
+
           <div className="composer">
-            <input
+            <textarea
+              ref={composerRef}
+              rows={1}
               value={draft}
-              placeholder="说点什么…"
+              placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"
               disabled={!sessionId}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                autoGrow();
+              }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   void send();
                 }

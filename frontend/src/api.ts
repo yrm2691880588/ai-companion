@@ -3,6 +3,7 @@ import type {
   AdminSettings,
   AdminSettingsResponse,
   Companion,
+  Latest,
   LoginResponse,
   Memory,
   Message,
@@ -203,6 +204,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ title }),
     });
+  },
+  async openSession(sessionId: number): Promise<Message> {
+    return request<Message>(`/v1/sessions/${sessionId}/opener`, { method: "POST" });
+  },
+  async latest(companionId: number): Promise<Latest> {
+    return request<Latest>(`/v1/companions/${companionId}/latest`);
   },
   async messages(sessionId: number): Promise<Message[]> {
     return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`);

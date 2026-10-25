@@ -383,3 +383,259 @@ label {
   border-radius: 999px;
   padding: 3px 10px;
 }
+
+/* ---------- 伴侣卡（首页） ---------- */
+.companions {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.companion-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-main {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: inherit;
+}
+
+.card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.card-info h3 {
+  margin: 0;
+}
+
+.avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--on-accent);
+  background: linear-gradient(
+    135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 55%, white)
+  );
+  flex: none;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.last-line {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  position: relative;
+  align-items: center;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 110px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(44, 36, 48, 0.12);
+  z-index: 5;
+}
+
+.menu a,
+.menu button {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  border-radius: 6px;
+}
+
+.menu a:hover,
+.menu button:hover {
+  background: var(--panel-2);
+}
+
+.danger-text {
+  color: var(--danger) !important;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(44, 36, 48, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 50;
+}
+
+.modal {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 24px 60px rgba(44, 36, 48, 0.25);
+}
+
+.skeleton-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.skeleton {
+  background: var(--panel-2);
+  border-radius: 50%;
+}
+
+.skeleton-line {
+  height: 12px;
+  width: 60%;
+  border-radius: 999px;
+  background: var(--panel-2);
+  margin: 6px 0;
+}
+
+.skeleton-line.short {
+  width: 35%;
+}
+
+.empty-card {
+  text-align: center;
+  padding: 30px 16px;
+}
+
+/* ---------- 聊天 ---------- */
+.chat-panel {
+  position: relative;
+  min-width: 0;
+}
+
+.messages {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  padding: 12px;
+  scroll-behavior: smooth;
+}
+
+.bubble-content {
+  white-space: pre-wrap;
+}
+
+.bubble-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.9;
+}
+
+.bubble-meta .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.date-divider {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.date-divider span {
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-time {
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+}
+
+.jump-latest {
+  position: absolute;
+  right: 14px;
+  bottom: 84px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: 0 8px 20px rgba(44, 36, 48, 0.12);
+  z-index: 2;
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  min-height: 40px;
+  line-height: 1.5;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: #2c2430;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  z-index: 60;
+}
+
+.empty-chat {
+  color: var(--muted);
+  text-align: center;
+  padding: 30px 10px;
+}
+
+.typing {
+  opacity: 0.8;
+}

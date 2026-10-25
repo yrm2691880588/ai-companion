@@ -90,6 +90,23 @@ class SqlChatRepository:
             )
         return [_to_message(row) for row in reversed(rows)]
 
+    async def latest_for_companion(self, user_id: str, companion_id: int) -> MessageRecord | None:
+        async with self._session_factory() as session:
+            row = (
+                await session.execute(
+                    select(ChatMessage)
+                    .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                    .where(
+                        ChatSession.companion_id == companion_id,
+                        ChatSession.user_id == user_id,
+                        ChatSession.deleted_at.is_(None),
+                    )
+                    .order_by(ChatMessage.id.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+        return _to_message(row) if row is not None else None
+
     async def append_message(
         self,
         user_id: str,
