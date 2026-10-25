@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AI 伴侣</title>
+    <script>
+      // 在 React 启动前先应用主题，避免刷新时闪白
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem("ui.theme") || "{}");
+          var root = document.documentElement;
+          root.dataset.theme = saved.preset || "rose";
+          if (saved.custom) {
+            root.dataset.theme = "custom";
+            root.style.setProperty("--accent", saved.custom);
+            root.style.setProperty("--accent-2", saved.custom);
+            root.style.setProperty(
+              "--accent-soft",
+              "color-mix(in srgb, " + saved.custom + " 13%, white)"
+            );
+          }
+        } catch (error) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -27,6 +27,8 @@
 | 删除伴侣：软删 + 异步硬清 + 补偿对账 | ✅ 真库验证全部归零（[说明](docs/删除与数据清理.md)） |
 | P1：重新生成（原地替换）+ 数据导出 | ✅ 真实链路验证（[对话说明](docs/对话接口与SSE.md)） |
 | 管理员：角色、额度开关、统一模型配置、审计 | ✅ 真库验证（[说明](docs/管理员与系统设置.md)） |
+| 粉色恋爱主题 + 6 套预设 + 自定义主色 | ✅ 已应用（[说明](docs/一键启动.md)） |
+| 一键启动：双击脚本、自动开页 | ✅ 实测页面与接口同源可用（[说明](docs/一键启动.md)） |
 | 前端（H5）：伴侣/创建/对话/记忆/演练/模型设置/登录 | ✅ 已联调（[说明](docs/前端说明.md)） |
 | HTTP API（模型只读接口、健康检查） | ✅ 可用 |
 | DeepSeek 官方真实调用 | ✅ 已跑通（流式、JSON、缓存命中、延迟与成本已实测） |
@@ -46,6 +48,16 @@ docs/               方案、接口与实测文档
 
 ## 快速开始（Windows PowerShell 7）
 
+### 普通用户：双击启动
+
+1. 打开项目文件夹；
+2. 双击 **`启动AI伴侣.bat`**；
+3. 浏览器自动打开 `http://127.0.0.1:8000/`。
+
+关闭窗口即停止服务。详细说明见 [一键启动](docs/一键启动.md)。
+
+### 开发者：命令行
+
 ```powershell
 # 1) 环境变量：复制模板并按需填写（至少填 AI_COMPANION_MASTER_KEY 与 DeepSeek Key）
 Copy-Item .env.example .env
@@ -61,9 +73,13 @@ Push-Location backend; .venv/Scripts/python.exe -m alembic upgrade head; Pop-Loc
 Push-Location backend; .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000; Pop-Location
 ```
 
-打开 `http://127.0.0.1:8000/docs` 可看接口文档。
+打开 `http://127.0.0.1:8000/docs` 可看接口文档；前端生产构建由后端在 `http://127.0.0.1:8000/` 直接托管。
 
 ## 前端
+
+生产/日常使用：双击 `启动AI伴侣.bat`，由后端托管构建产物（`http://127.0.0.1:8000/`）。
+
+开发调试（热更新）：
 
 ```powershell
 ./scripts/dev-web.ps1
@@ -73,8 +89,7 @@ pnpm install --registry=https://registry.npmmirror.com
 pnpm dev
 ```
 
-打开 `http://127.0.0.1:5273`：伴侣列表 → 创建（一句话/模板）→ 聊天（流式）→ 记忆 → 演练 → 模型与服务。
-开发期登录态用 `X-User-Id`（默认 `dev-user`），可在「模型与服务」页切换。
+打开 `http://127.0.0.1:5273`。开发期登录态默认用 `X-User-Id`（`dev-user`），也可用「登录」页走验证码；管理员手机号在 `.env` 的 `AI_COMPANION_ADMIN_PHONES` 配置。
 
 ## 配置
 

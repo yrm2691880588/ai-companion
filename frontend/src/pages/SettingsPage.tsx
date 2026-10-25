@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getUserId, setUserId } from "../api";
+import { PRESETS, loadTheme, saveTheme, type ThemeState } from "../theme";
 import type {
   Account,
   AdminSettingsResponse,
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const [admin, setAdmin] = useState<AdminSettingsResponse | null>(null);
   const [adminSaved, setAdminSaved] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [theme, setTheme] = useState<ThemeState>(() => loadTheme());
   const [user, setUser] = useState(getUserId());
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -107,6 +109,53 @@ export default function SettingsPage() {
         <a className="btn ghost" style={{ marginLeft: 8 }} href="/v1/me/export" target="_blank" rel="noreferrer">
           导出我的数据（JSON）
         </a>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2>外观</h2>
+        <p className="muted">
+          默认粉色恋爱主题，可换主色；按钮文字会自动选黑/白保证可读。
+        </p>
+        <div className="row">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              className={theme.preset === preset.key && !theme.custom ? "primary" : ""}
+              onClick={() => {
+                const next: ThemeState = { preset: preset.key, custom: "" };
+                setTheme(next);
+                saveTheme(next);
+              }}
+            >
+              {preset.name}
+            </button>
+          ))}
+        </div>
+        <div className="composer" style={{ marginTop: 10 }}>
+          <label className="muted" style={{ alignSelf: "center" }}>
+            自定义主色
+          </label>
+          <input
+            type="color"
+            value={theme.custom || "#C63B69"}
+            onChange={(event) => {
+              const next: ThemeState = { preset: theme.preset, custom: event.target.value };
+              setTheme(next);
+              saveTheme(next);
+            }}
+            style={{ width: 64, height: 36, padding: 2, flex: "none" }}
+          />
+          <button
+            className="ghost"
+            onClick={() => {
+              const next: ThemeState = { preset: "rose", custom: "" };
+              setTheme(next);
+              saveTheme(next);
+            }}
+          >
+            恢复默认粉色
+          </button>
+        </div>
       </div>
 
       {account?.role === "admin" && admin && (

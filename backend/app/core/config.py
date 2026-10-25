@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     session_days: int = 7
     # 管理员手机号（逗号分隔），登录时自动授予 admin
     admin_phones: str = ""
+    # 前端构建产物目录；留空则用仓库下的 frontend/dist
+    frontend_dist: str = ""
 
     @property
     def admin_phone_set(self) -> set[str]:

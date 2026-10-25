@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import me_router as me_router
@@ -220,7 +222,34 @@ def create_app(
             "env": resolved.env,
         }
 
+    _mount_frontend(app, resolved.frontend_dist)
     return app
+
+
+def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
+    """有构建产物时，由后端直接托管前端，双击启动只需一个进程。"""
+    dist = (
+        Path(dist_setting)
+        if dist_setting
+        else Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    )
+    index = dist / "index.html"
+    if not index.is_file():
+        return
+    assets = dist / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa(full_path: str) -> FileResponse:
+        if full_path == "v1" or full_path.startswith("v1/"):
+            raise AppError(code="NOT_FOUND", message="接口不存在", status_code=404)
+        candidate = dist / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        if full_path and candidate.suffix:
+            raise AppError(code="NOT_FOUND", message="文件不存在", status_code=404)
+        return FileResponse(index)
 
 
 app = create_app()

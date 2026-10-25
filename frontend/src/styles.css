@@ -1,16 +1,69 @@
 :root {
-  --bg: #0f1216;
-  --panel: #171c22;
-  --panel-2: #1e252d;
-  --text: #e8edf3;
-  --muted: #8d9aab;
-  --line: #2a3440;
-  --accent: #7aa7ff;
-  --accent-2: #63d6b4;
-  --danger: #ff7a7a;
-  --radius: 12px;
+  --bg: #fff8fa;
+  --panel: #ffffff;
+  --panel-2: #fff2f6;
+  --text: #2c2430;
+  --muted: #6d5b65;
+  --line: #f0d9e1;
+  --accent: #c63b69;
+  --accent-2: #e86a92;
+  --accent-soft: #fde7ef;
+  --on-accent: #ffffff;
+  --danger: #c43d5b;
+  --topbar: rgba(255, 248, 250, 0.92);
+  --radius: 14px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei",
     sans-serif;
+}
+
+:root[data-theme="peach"] {
+  --bg: #fff9f5;
+  --panel-2: #fff0e8;
+  --line: #f2dccf;
+  --accent: #d9603b;
+  --accent-2: #e8835f;
+  --accent-soft: #fdebe2;
+  --topbar: rgba(255, 249, 245, 0.92);
+}
+
+:root[data-theme="sakura"] {
+  --bg: #fff8fc;
+  --panel-2: #fceef7;
+  --line: #f0d6e8;
+  --accent: #b84a8c;
+  --accent-2: #d171a9;
+  --accent-soft: #f9e6f2;
+  --topbar: rgba(255, 248, 252, 0.92);
+}
+
+:root[data-theme="latte"] {
+  --bg: #fffaf5;
+  --panel-2: #f5ebe3;
+  --line: #e8d8cc;
+  --accent: #a56a4a;
+  --accent-2: #bd8767;
+  --accent-soft: #f4e8df;
+  --topbar: rgba(255, 250, 245, 0.92);
+}
+
+:root[data-theme="mint"] {
+  --bg: #f7fdfb;
+  --panel-2: #e9f7f2;
+  --line: #d2e9e1;
+  --accent: #2f8f7a;
+  --accent-2: #4faa95;
+  --accent-soft: #e2f4ee;
+  --topbar: rgba(247, 253, 251, 0.92);
+}
+
+:root[data-theme="dusk"] {
+  --bg: #f8f9ff;
+  --panel-2: #eef1fb;
+  --line: #dbe1f4;
+  --accent: #5b6fb5;
+  --accent-2: #7d8fcb;
+  --accent-soft: #e8ecfb;
+  --topbar: rgba(248, 249, 255, 0.92);
 }
 
 * {
@@ -19,8 +72,13 @@
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
+  background:
+    radial-gradient(circle at 12% -8%, color-mix(in srgb, var(--accent) 14%, white) 0%, transparent 42%),
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--accent-2) 10%, white) 0%, transparent 38%),
+    var(--bg);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 a {
@@ -42,14 +100,14 @@ a {
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  background: rgba(15, 18, 22, 0.92);
+  background: var(--topbar);
   backdrop-filter: blur(8px);
   z-index: 10;
 }
 
 .brand {
   font-weight: 700;
-  color: var(--text);
+  color: var(--accent);
   letter-spacing: 0.5px;
 }
 
@@ -64,7 +122,8 @@ a {
 }
 
 .nav a.active {
-  color: var(--text);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .main {
@@ -107,6 +166,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
 .card h3 {
@@ -141,10 +201,11 @@ button:hover {
   border-color: var(--accent);
 }
 
-button.primary {
+button.primary,
+.btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0b1220;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -154,7 +215,7 @@ button.ghost {
 
 button.danger {
   color: var(--danger);
-  border-color: rgba(255, 122, 122, 0.4);
+  border-color: color-mix(in srgb, var(--danger) 40%, white);
 }
 
 button:disabled {
@@ -194,8 +255,8 @@ label {
 }
 
 .alert {
-  border: 1px solid rgba(255, 122, 122, 0.4);
-  background: rgba(255, 122, 122, 0.08);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, white);
+  background: color-mix(in srgb, var(--danger) 8%, white);
   color: var(--danger);
   padding: 10px 12px;
   border-radius: 10px;
@@ -204,9 +265,9 @@ label {
 }
 
 .notice {
-  border: 1px solid rgba(99, 214, 180, 0.3);
-  background: rgba(99, 214, 180, 0.08);
-  color: var(--accent-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, white);
+  background: var(--accent-soft);
+  color: var(--accent);
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 13px;
@@ -269,8 +330,8 @@ label {
 
 .bubble.user {
   align-self: flex-end;
-  background: rgba(122, 167, 255, 0.18);
-  border: 1px solid rgba(122, 167, 255, 0.35);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, white);
 }
 
 .bubble.assistant {
