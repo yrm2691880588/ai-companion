@@ -92,62 +92,76 @@ export default function AdminSettingsCard() {
         />
       </div>
 
+      <p className="muted">
+        温度越高越发散，top_p 越低越保守；思考模式会增加延迟和成本。保存后下一条回复生效。
+      </p>
+
       {(["chat_main", "persona_generate"] as const).map((task) => {
         const item = admin.settings.model_defaults[task];
         const label = task === "chat_main" ? "日常对话" : "人设生成";
         return (
           <div key={task} style={{ marginTop: 14 }}>
             <h3>{label}</h3>
-            <div className="composer">
-              <select
-                value={item.model}
-                onChange={(event) => patchTask(task, { model: event.target.value })}
-              >
-                <option value="">跟随系统路由</option>
-                {admin.models.map((model) => (
-                  <option key={model.key} value={model.key}>
-                    {model.display_name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                step="0.1"
-                min={0}
-                max={2}
-                value={item.temperature}
-                onChange={(event) =>
-                  patchTask(task, { temperature: Number(event.target.value) })
-                }
-              />
-              <input
-                type="number"
-                min={32}
-                max={4096}
-                value={item.max_tokens}
-                onChange={(event) => patchTask(task, { max_tokens: Number(event.target.value) })}
-              />
-              <input
-                type="number"
-                step="0.05"
-                min={0}
-                max={1}
-                value={item.top_p ?? 0.95}
-                onChange={(event) => patchTask(task, { top_p: Number(event.target.value) })}
-              />
-              <label className="muted" style={{ alignSelf: "center" }}>
+            <div className="admin-field-grid">
+              <label className="admin-field wide">
+                <span>模型</span>
+                <select
+                  value={item.model}
+                  onChange={(event) => patchTask(task, { model: event.target.value })}
+                >
+                  <option value="">跟随系统路由</option>
+                  {admin.models.map((model) => (
+                    <option key={model.key} value={model.key}>
+                      {model.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-field">
+                <span>温度（0–2）</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  max={2}
+                  value={item.temperature}
+                  onChange={(event) =>
+                    patchTask(task, { temperature: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="admin-field">
+                <span>top_p（0–1）</span>
+                <input
+                  type="number"
+                  step="0.05"
+                  min={0}
+                  max={1}
+                  value={item.top_p ?? 0.95}
+                  onChange={(event) => patchTask(task, { top_p: Number(event.target.value) })}
+                />
+              </label>
+              <label className="admin-field wide">
+                <span>最大输出（tokens，32–4096）</span>
+                <input
+                  type="number"
+                  min={32}
+                  max={4096}
+                  value={item.max_tokens}
+                  onChange={(event) =>
+                    patchTask(task, { max_tokens: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="admin-check">
                 <input
                   type="checkbox"
                   checked={item.thinking}
                   onChange={(event) => patchTask(task, { thinking: event.target.checked })}
-                />{" "}
-                思考模式
+                />
+                <span>思考模式</span>
               </label>
             </div>
-            <p className="muted">
-              温度 {item.temperature} · top_p {item.top_p ?? 0.95} · 最大输出 {item.max_tokens}{" "}
-              tokens
-            </p>
           </div>
         );
       })}

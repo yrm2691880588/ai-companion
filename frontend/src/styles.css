@@ -729,6 +729,64 @@ label {
   font-size: 12px;
 }
 
+/* ---------- 管理员参数表单 ---------- */
+.admin-field-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
+  align-items: end;
+  margin-top: 8px;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.admin-field > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.admin-field.wide {
+  grid-column: span 2;
+}
+
+.admin-field input,
+.admin-field select {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-check {
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.admin-check input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .admin-field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-field.wide,
+  .admin-check {
+    grid-column: span 2;
+  }
+}
+
 /* ---------- 移动端 ---------- */
 @media (max-width: 720px) {
   .main {
