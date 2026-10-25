@@ -237,6 +237,44 @@ class SqlChatRepository:
             await session.commit()
             return True
 
+    async def rename_session(
+        self, user_id: str, session_id: int, title: str
+    ) -> SessionRecord | None:
+        async with self._session_factory() as session:
+            row = (
+                await session.execute(
+                    select(ChatSession).where(
+                        ChatSession.id == session_id,
+                        ChatSession.user_id == user_id,
+                        ChatSession.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            row.title = title
+            await session.commit()
+            return _to_session(row)
+
+    async def delete_message(self, user_id: str, message_id: int) -> bool:
+        async with self._session_factory() as session:
+            row = (
+                await session.execute(
+                    select(ChatMessage)
+                    .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                    .where(
+                        ChatMessage.id == message_id,
+                        ChatSession.user_id == user_id,
+                        ChatSession.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return False
+            await session.delete(row)
+            await session.commit()
+            return True
+
 
 def _to_session(row: ChatSession) -> SessionRecord:
     return SessionRecord(

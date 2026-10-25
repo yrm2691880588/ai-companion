@@ -639,3 +639,114 @@ label {
 .typing {
   opacity: 0.8;
 }
+
+/* ---------- 会话管理 ---------- */
+.session-group {
+  margin-bottom: 8px;
+}
+
+.session-group-label {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 8px;
+}
+
+.session-item {
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.session-item:hover {
+  background: var(--panel-2);
+}
+
+.session-actions {
+  display: none;
+  gap: 6px;
+}
+
+.session-item:hover .session-actions,
+.session-item.active .session-actions {
+  display: flex;
+}
+
+.session-actions .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.nav-user {
+  color: var(--muted);
+  font-size: 13px;
+  align-self: center;
+}
+
+.error-detail {
+  white-space: pre-wrap;
+  background: var(--panel-2);
+  padding: 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 720px) {
+  .main {
+    padding: 12px 10px 40px;
+  }
+
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .nav {
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-layout aside {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .session-list {
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .messages {
+    max-height: calc(100vh - 330px);
+    min-height: 260px;
+  }
+
+  .composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    z-index: 3;
+  }
+
+  .composer textarea {
+    min-height: 44px;
+  }
+
+  .companions {
+    grid-template-columns: 1fr;
+  }
+
+  button,
+  .btn {
+    min-height: 40px;
+  }
+}

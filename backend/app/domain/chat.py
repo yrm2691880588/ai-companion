@@ -134,6 +134,12 @@ class ChatRepository(Protocol):
 
     async def delete_session(self, user_id: str, session_id: int) -> bool: ...
 
+    async def rename_session(
+        self, user_id: str, session_id: int, title: str
+    ) -> SessionRecord | None: ...
+
+    async def delete_message(self, user_id: str, message_id: int) -> bool: ...
+
 
 class InMemoryChatRepository:
     def __init__(self) -> None:
@@ -271,6 +277,26 @@ class InMemoryChatRepository:
         self.messages.pop(session_id, None)
         return True
 
+    async def rename_session(
+        self, user_id: str, session_id: int, title: str
+    ) -> SessionRecord | None:
+        session = await self.get_session(user_id, session_id)
+        if session is None:
+            return None
+        session.title = title
+        return session
+
+    async def delete_message(self, user_id: str, message_id: int) -> bool:
+        for session_id, items in self.messages.items():
+            session = await self.get_session(user_id, session_id)
+            if session is None:
+                continue
+            for index, item in enumerate(items):
+                if item.id == message_id:
+                    items.pop(index)
+                    return True
+        return False
+
 
 class ChatStreamer(Protocol):
     def stream(
@@ -365,6 +391,22 @@ class ChatService:
     async def delete_session(self, user_id: str, session_id: int) -> None:
         await self.get_session(user_id, session_id)
         await self._repo.delete_session(user_id, session_id)
+
+    async def rename_session(self, user_id: str, session_id: int, title: str) -> SessionRecord:
+        cleaned = (title or "").strip()
+        if not cleaned:
+            raise InvalidInput("会话标题不能为空")
+        if len(cleaned) > 60:
+            raise InvalidInput("会话标题最多 60 字")
+        await self.get_session(user_id, session_id)
+        updated = await self._repo.rename_session(user_id, session_id, cleaned)
+        if updated is None:
+            raise NotFound("会话不存在")
+        return updated
+
+    async def delete_message(self, user_id: str, message_id: int) -> None:
+        if not await self._repo.delete_message(user_id, message_id):
+            raise NotFound("消息不存在")
 
     async def latest_message(self, user_id: str, companion_id: int) -> MessageRecord | None:
         await self._companions.get(user_id, companion_id)

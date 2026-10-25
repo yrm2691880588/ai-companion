@@ -208,6 +208,18 @@ export const api = {
   async openSession(sessionId: number): Promise<Message> {
     return request<Message>(`/v1/sessions/${sessionId}/opener`, { method: "POST" });
   },
+  async renameSession(sessionId: number, title: string): Promise<Session> {
+    return request<Session>(`/v1/sessions/${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+  },
+  async deleteSession(sessionId: number): Promise<void> {
+    await request<void>(`/v1/sessions/${sessionId}`, { method: "DELETE" });
+  },
+  async deleteMessage(messageId: number): Promise<void> {
+    await request<void>(`/v1/messages/${messageId}`, { method: "DELETE" });
+  },
   async latest(companionId: number): Promise<Latest> {
     return request<Latest>(`/v1/companions/${companionId}/latest`);
   },

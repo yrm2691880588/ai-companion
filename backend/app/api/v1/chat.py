@@ -16,6 +16,7 @@ from app.api.v1.chat_schemas import (
     SendMessageIn,
     SessionCreateIn,
     SessionOut,
+    SessionRenameIn,
     SummaryOut,
 )
 from app.api.v1.personas import request_id
@@ -92,6 +93,27 @@ async def delete_session(
     service: Annotated[ChatService, Depends(get_chat_service)],
 ) -> Response:
     await service.delete_session(user_id, session_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/sessions/{session_id}", response_model=SessionOut)
+async def rename_session(
+    session_id: int,
+    payload: SessionRenameIn,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[ChatService, Depends(get_chat_service)],
+) -> SessionOut:
+    record = await service.rename_session(user_id, session_id, payload.title)
+    return _session_out(record)
+
+
+@router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(
+    message_id: int,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[ChatService, Depends(get_chat_service)],
+) -> Response:
+    await service.delete_message(user_id, message_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

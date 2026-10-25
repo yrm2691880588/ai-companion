@@ -49,6 +49,12 @@ export default function ChatPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [quota, setQuota] = useState<Quota | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [confirm, setConfirm] = useState<
+    { kind: "session" | "message"; id: number; title: string } | null
+  >(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -245,6 +251,59 @@ export default function ChatPage() {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }
 
+  function groupOf(iso: string): string {
+    const date = new Date(iso);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return "今天";
+    if (date.toDateString() === yesterday.toDateString()) return "昨天";
+    return "更早";
+  }
+
+  async function saveRename(id: number) {
+    const title = renameDraft.trim();
+    if (!title) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      const updated = await api.renameSession(id, title);
+      setSessions((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      setRenamingId(null);
+    } catch (event) {
+      setError((event as Error).message);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!confirm) return;
+    setConfirmBusy(true);
+    try {
+      if (confirm.kind === "session") {
+        await api.deleteSession(confirm.id);
+        const list = await api.sessions(companionId);
+        setSessions(list);
+        setConfirm(null);
+        if (list.length > 0) await selectSession(list[0].id);
+        else await newSession();
+      } else {
+        await api.deleteMessage(confirm.id);
+        setConfirm(null);
+        if (sessionId) setMessages(await api.messages(sessionId));
+      }
+    } catch (event) {
+      setError((event as Error).message);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  const grouped: Record<string, Session[]> = { 今天: [], 昨天: [], 更早: [] };
+  for (const item of sessions) {
+    grouped[groupOf(item.last_message_at || item.created_at)].push(item);
+  }
+
   const lastAssistantId = [...messages].reverse().find((item) => item.role === "assistant")?.id;
 
   return (
@@ -288,18 +347,68 @@ export default function ChatPage() {
             + 新会话
           </button>
           <div className="session-list" style={{ marginTop: 8 }}>
-            {sessions.map((item) => (
-              <button
-                key={item.id}
-                className={`session-item ${item.id === sessionId ? "active" : ""}`}
-                onClick={() => void selectSession(item.id)}
-              >
-                <span className="session-title">{item.title || "未命名会话"}</span>
-                <span className="session-time">
-                  {relativeTime(item.last_message_at || item.created_at)}
-                </span>
-              </button>
-            ))}
+            {Object.entries(grouped).map(([label, list]) =>
+              list.length === 0 ? null : (
+                <div key={label} className="session-group">
+                  <div className="session-group-label">{label}</div>
+                  {list.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`session-item ${item.id === sessionId ? "active" : ""}`}
+                      onClick={() => void selectSession(item.id)}
+                    >
+                      {renamingId === item.id ? (
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onBlur={() => void saveRename(item.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") void saveRename(item.id);
+                            if (event.key === "Escape") setRenamingId(null);
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <span className="session-title">{item.title || "未命名会话"}</span>
+                          <span className="session-time">
+                            {relativeTime(item.last_message_at || item.created_at)}
+                          </span>
+                          <span className="session-actions">
+                            <button
+                              className="link"
+                              title="重命名"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setRenamingId(item.id);
+                                setRenameDraft(item.title || "");
+                              }}
+                            >
+                              改
+                            </button>
+                            <button
+                              className="link danger-text"
+                              title="删除会话"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setConfirm({
+                                  kind: "session",
+                                  id: item.id,
+                                  title: item.title || "未命名会话",
+                                });
+                              }}
+                            >
+                              删
+                            </button>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ),
+            )}
           </div>
         </aside>
 
@@ -323,6 +432,18 @@ export default function ChatPage() {
                       <span>{formatTime(item.created_at)}</span>
                       <button className="link" onClick={() => void copy(item.content)}>
                         复制
+                      </button>
+                      <button
+                        className="link danger-text"
+                        onClick={() =>
+                          setConfirm({
+                            kind: "message",
+                            id: item.id,
+                            title: item.content.slice(0, 20),
+                          })
+                        }
+                      >
+                        删除
                       </button>
                       {item.role === "assistant" && item.id === lastAssistantId && !streaming && (
                         <button className="link" onClick={() => void regenerate(item.id)}>
@@ -381,6 +502,27 @@ export default function ChatPage() {
           </div>
         </section>
       </div>
+
+      {confirm && (
+        <div className="modal-backdrop" onClick={() => !confirmBusy && setConfirm(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <h2>{confirm.kind === "session" ? "删除会话" : "删除消息"}</h2>
+            <p className="muted">
+              {confirm.kind === "session"
+                ? `会删除「${confirm.title}」里的全部消息，不可恢复。`
+                : `确定删除这条消息吗？删除后不会出现在历史里。`}
+            </p>
+            <div className="toolbar">
+              <button className="danger" disabled={confirmBusy} onClick={() => void confirmDelete()}>
+                {confirmBusy ? "删除中…" : "确认删除"}
+              </button>
+              <button className="ghost" disabled={confirmBusy} onClick={() => setConfirm(null)}>
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
