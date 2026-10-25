@@ -193,6 +193,12 @@ export const api = {
       body: JSON.stringify({ persona }),
     });
   },
+  async setAvatar(id: number, avatar: string | null): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}/avatar`, {
+      method: "PUT",
+      body: JSON.stringify({ avatar }),
+    });
+  },
   async templates(): Promise<Template[]> {
     return request<Template[]>("/v1/templates");
   },

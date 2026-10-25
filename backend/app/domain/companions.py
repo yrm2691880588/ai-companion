@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 from collections.abc import Sequence
@@ -25,6 +26,8 @@ from app.infra.llm.types import Message, Role, TaskName, Usage
 MAX_COMPANIONS = 10
 MIN_DESCRIPTION = 4
 MAX_DESCRIPTION = 200
+MAX_AVATAR_BYTES = 300 * 1024
+AVATAR_RE = re.compile(r"^data:image/(png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -36,6 +39,7 @@ class CompanionRecord:
     persona: Persona
     compiled_prompt: str
     memory_enabled: bool = True
+    avatar: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -76,6 +80,10 @@ class CompanionRepository(Protocol):
     async def soft_delete(self, user_id: str, companion_id: int) -> bool: ...
 
     async def set_memory_enabled(self, user_id: str, companion_id: int, enabled: bool) -> bool: ...
+
+    async def set_avatar(
+        self, user_id: str, companion_id: int, avatar: str | None
+    ) -> CompanionRecord | None: ...
 
 
 class InMemoryCompanionRepository:
@@ -141,6 +149,16 @@ class InMemoryCompanionRepository:
         item.memory_enabled = enabled
         return True
 
+    async def set_avatar(
+        self, user_id: str, companion_id: int, avatar: str | None
+    ) -> CompanionRecord | None:
+        item = await self.get(user_id, companion_id)
+        if item is None:
+            return None
+        item.avatar = avatar
+        item.updated_at = datetime.now(UTC)
+        return item
+
 
 _JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
@@ -171,14 +189,24 @@ _DRAFT_SYSTEM = """你是一个角色设计助手，为「AI 伴侣」产品设�
 - identity: 身份或职业角色（如：心理学研究生、产品经理）
 - gender: 女 / 男 / 其他 / 不设定
 - age: 18–99 的整数（产品面向成年人，禁止未成年角色）
-- personality: 2–6 个性格词，最好带一点矛盾感
+- personality: 2–8 个性格词，最好带一点矛盾感
 - speaking_style: 具体可执行的说话方式（句长、用词、口头禅、是否会调侃），不要只写“温柔”
 - background: 3–5 句经历与当前处境
-- tags: 2–6 个短标签
+- tags: 2–8 个短标签
 - relationship: 与用户的关系定位（如：住在隔壁的学姐）
 - example_openers: 2–3 句这个角色会说的开场白
-要求：像真人，有优点也有缺点；不要用列表式说话；不要出现“AI”“模型”字样。
-边界：可以设计成年人之间自愿的亲密关系、调情与性张力；禁止未成年、非自愿、乱伦、兽交与违法内容。"""
+
+最高优先级：忠实还原用户描述。
+- 用户明确写的身份、年龄、关系、性格、欲望倾向，必须原样落到对应字段，
+  不得擅自净化、删减、替换或添加道德说教；
+- 用户描述里“主动、勾引、性欲强、占有欲、黏人”等成人向特征，
+  要写进 personality / speaking_style / background / relationship，不要改成“温柔纯洁”；
+- example_openers 要体现这种主动与暧昧，用角色会说的话，不要写成通用问候；
+- 用户没写的部分才合理补全；补全内容不得与描述冲突；
+- 可以用直白词汇，只要服务于角色；不要罗列身体细节。
+
+边界（只拒绝这些）：未成年、非自愿、乱伦、兽交、真实人物色情、违法方法。
+除此之外按用户描述设计，不要拒绝，不要解释规则。"""
 
 
 def _draft_messages(description: str) -> list[Message]:
@@ -298,6 +326,27 @@ class CompanionService:
         if not await self._repo.set_memory_enabled(user_id, companion_id, enabled):
             raise NotFound("伴侣不存在")
         return await self.get(user_id, companion_id)
+
+    async def set_avatar(
+        self, user_id: str, companion_id: int, avatar: str | None
+    ) -> CompanionRecord:
+        cleaned: str | None = None
+        if avatar and avatar.strip():
+            value = avatar.strip()
+            match = AVATAR_RE.match(value)
+            if match is None:
+                raise InvalidInput("头像必须是 PNG/JPEG/WebP 的 data URL", code="AVATAR_INVALID")
+            try:
+                raw = base64.b64decode(match.group(2), validate=True)
+            except Exception as exc:  # noqa: BLE001
+                raise InvalidInput("头像数据损坏", code="AVATAR_INVALID") from exc
+            if len(raw) > MAX_AVATAR_BYTES:
+                raise InvalidInput("头像不能超过 300KB", code="AVATAR_TOO_LARGE")
+            cleaned = value
+        record = await self._repo.set_avatar(user_id, companion_id, cleaned)
+        if record is None:
+            raise NotFound("伴侣不存在")
+        return record
 
     async def get(self, user_id: str, companion_id: int) -> CompanionRecord:
         record = await self._repo.get(user_id, companion_id)

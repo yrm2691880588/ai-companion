@@ -1,7 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import type { Companion, Latest } from "../types";
+
+function resizeAvatar(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("请选择图片文件"));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const size = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(url);
+        reject(new Error("图片处理失败"));
+        return;
+      }
+      const scale = Math.max(size / image.width, size / image.height);
+      const width = image.width * scale;
+      const height = image.height * scale;
+      context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("图片读取失败"));
+    };
+    image.src = url;
+  });
+}
 
 function relativeTime(iso?: string | null): string {
   if (!iso) return "";
@@ -26,6 +61,9 @@ export default function CompanionsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Companion | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [avatarTarget, setAvatarTarget] = useState<number | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function reload() {
     try {
@@ -51,6 +89,39 @@ export default function CompanionsPage() {
     setDeleteTarget(item);
     setDeleteName("");
     setError("");
+  }
+
+  function pickAvatar(id: number) {
+    setAvatarTarget(id);
+    fileInputRef.current?.click();
+  }
+
+  async function onAvatarFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !avatarTarget) return;
+    setAvatarBusy(true);
+    setError("");
+    try {
+      const avatar = await resizeAvatar(file);
+      const updated = await api.setAvatar(avatarTarget, avatar);
+      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAvatarBusy(false);
+      setAvatarTarget(null);
+    }
+  }
+
+  async function clearAvatar(item: Companion) {
+    try {
+      const updated = await api.setAvatar(item.id, null);
+      setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      setMenuId(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   async function confirmDelete() {
@@ -114,7 +185,22 @@ export default function CompanionsPage() {
             return (
               <div className="card companion-card" key={item.id}>
                 <Link className="card-main" to={`/companions/${item.id}/chat`}>
-                  <div className="avatar">{item.persona.name.slice(0, 1)}</div>
+                  <div
+                    className="avatar avatar-editable"
+                    title="点击更换头像"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      pickAvatar(item.id);
+                    }}
+                  >
+                    {item.avatar ? (
+                      <img src={item.avatar} alt={`${item.name} 的头像`} />
+                    ) : (
+                      item.persona.name.slice(0, 1)
+                    )}
+                    <span className="avatar-badge">{avatarBusy && avatarTarget === item.id ? "…" : "换"}</span>
+                  </div>
                   <div className="card-info">
                     <div className="row" style={{ justifyContent: "space-between" }}>
                       <h3>{item.name}</h3>
@@ -142,6 +228,11 @@ export default function CompanionsPage() {
                     <div className="menu">
                       <Link to={`/companions/${item.id}/memories`}>记忆</Link>
                       <Link to={`/companions/${item.id}/roleplay`}>演练</Link>
+                      {item.avatar && (
+                        <button className="link" onClick={() => void clearAvatar(item)}>
+                          清除头像
+                        </button>
+                      )}
                       <button className="link danger-text" onClick={() => askDelete(item)}>
                         删除
                       </button>
@@ -153,6 +244,14 @@ export default function CompanionsPage() {
           })}
         </div>
       )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        style={{ display: "none" }}
+        onChange={(event) => void onAvatarFile(event)}
+      />
 
       {deleteTarget && (
         <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>

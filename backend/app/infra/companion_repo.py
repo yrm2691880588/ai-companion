@@ -51,6 +51,7 @@ class SqlCompanionRepository:
                 persona=persona,
                 compiled_prompt=compiled_prompt,
                 memory_enabled=True,
+                avatar=companion.avatar,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at or datetime.now(UTC),
             )
@@ -128,6 +129,7 @@ class SqlCompanionRepository:
                 persona=persona,
                 compiled_prompt=compiled_prompt,
                 memory_enabled=companion.memory_enabled,
+                avatar=companion.avatar,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at,
             )
@@ -167,6 +169,26 @@ class SqlCompanionRepository:
             await session.commit()
             return True
 
+    async def set_avatar(
+        self, user_id: str, companion_id: int, avatar: str | None
+    ) -> CompanionRecord | None:
+        async with self._session_factory() as session:
+            companion = (
+                await session.execute(
+                    select(Companion).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if companion is None:
+                return None
+            companion.avatar = avatar
+            companion.updated_at = datetime.now(UTC)
+            await session.commit()
+            return await self.get(user_id, companion_id)
+
 
 def _to_record(companion: Companion, persona_row: CompanionPersona) -> CompanionRecord:
     persona = Persona.model_validate(persona_row.persona)
@@ -178,6 +200,7 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         persona=persona,
         compiled_prompt=persona_row.compiled_prompt,
         memory_enabled=companion.memory_enabled,
+        avatar=companion.avatar,
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )

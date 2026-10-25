@@ -65,12 +65,17 @@ class CompanionOut(BaseModel):
     current_version: int
     persona: Persona
     memory_enabled: bool = True
+    avatar: str | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class PersonaPutIn(BaseModel):
     persona: Persona
+
+
+class AvatarIn(BaseModel):
+    avatar: str | None = Field(default=None, max_length=500_000)
 
 
 class DimensionPatchIn(BaseModel):

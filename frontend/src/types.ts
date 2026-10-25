@@ -20,6 +20,7 @@ export interface Companion {
   current_version: number;
   persona: Persona;
   memory_enabled: boolean;
+  avatar?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -29,6 +29,7 @@ class Companion(Base):
     status: Mapped[str] = mapped_column(String(16), default="active")
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     memory_enabled: Mapped[bool] = mapped_column(default=True)
+    avatar: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

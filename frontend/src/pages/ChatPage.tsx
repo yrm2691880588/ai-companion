@@ -309,21 +309,32 @@ export default function ChatPage() {
   return (
     <div>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h1>{companion ? companion.name : "对话"}</h1>
-          <p className="muted">
-            {companion
-              ? `${companion.persona.relationship || companion.persona.identity} · 人设 v${companion.current_version}`
-              : "加载中…"}
-          </p>
-          {quota &&
-            (quota.enforced ? (
-              <span className="chip">
-                今日剩余 {quota.remaining}/{quota.limit} 轮
-              </span>
-            ) : (
-              <span className="chip">额度管控已暂停 · 稳定性测试中</span>
-            ))}
+        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+          {companion && (
+            <div className="avatar chat-avatar">
+              {companion.avatar ? (
+                <img src={companion.avatar} alt={`${companion.name} 的头像`} />
+              ) : (
+                companion.persona.name.slice(0, 1)
+              )}
+            </div>
+          )}
+          <div>
+            <h1>{companion ? companion.name : "对话"}</h1>
+            <p className="muted">
+              {companion
+                ? `${companion.persona.relationship || companion.persona.identity} · 人设 v${companion.current_version}`
+                : "加载中…"}
+            </p>
+            {quota &&
+              (quota.enforced ? (
+                <span className="chip">
+                  今日剩余 {quota.remaining}/{quota.limit} 轮
+                </span>
+              ) : (
+                <span className="chip">额度管控已暂停 · 稳定性测试中</span>
+              ))}
+          </div>
         </div>
         <div className="toolbar">
           <Link className="btn ghost" to={`/companions/${companionId}/memories`}>

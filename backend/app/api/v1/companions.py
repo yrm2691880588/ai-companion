@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 
 from app.api.deps import get_companion_service, get_current_user_id, get_deletion_service
 from app.api.v1.companion_schemas import (
+    AvatarIn,
     CompanionCreateIn,
     CompanionOut,
     DimensionPatchIn,
@@ -30,6 +31,7 @@ def _out(record: CompanionRecord) -> CompanionOut:
         current_version=record.current_version,
         persona=record.persona,
         memory_enabled=record.memory_enabled,
+        avatar=record.avatar,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -119,6 +121,18 @@ async def regenerate_dimension(
         model_key=result.model_key,
         cost_cny=float(result.cost_cny),
     )
+
+
+@router.put("/{companion_id}/avatar", response_model=CompanionOut)
+async def set_avatar(
+    companion_id: int,
+    payload: AvatarIn,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> CompanionOut:
+    """上传/清除头像：data URL（PNG/JPEG/WebP，≤300KB）。"""
+    record = await service.set_avatar(user_id, companion_id, payload.avatar)
+    return _out(record)
 
 
 @router.delete("/{companion_id}", status_code=status.HTTP_204_NO_CONTENT)

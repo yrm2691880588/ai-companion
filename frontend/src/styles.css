@@ -427,6 +427,41 @@ label {
   );
   flex: none;
   box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 28%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-editable {
+  cursor: pointer;
+}
+
+.avatar-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.chat-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
 }
 
 .last-line {
