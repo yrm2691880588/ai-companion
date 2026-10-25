@@ -71,6 +71,8 @@ class AnthropicAdapter:
             payload["system"] = system
         if params.temperature is not None:
             payload["temperature"] = params.temperature
+        if params.top_p is not None:
+            payload["top_p"] = params.top_p
         payload.update(params.extra)
         headers = {
             "x-api-key": provider.api_key,

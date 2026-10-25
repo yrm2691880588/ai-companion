@@ -75,6 +75,8 @@ def build_payload(
         payload["temperature"] = params.temperature
     if params.max_tokens is not None:
         payload["max_tokens"] = params.max_tokens
+    if params.top_p is not None:
+        payload["top_p"] = params.top_p
     if params.json_mode:
         payload["response_format"] = {"type": "json_object"}
     payload.update(_thinking_payload(provider, spec, params))

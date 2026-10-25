@@ -30,7 +30,7 @@ async def test_update_quota_and_model_defaults() -> None:
         {
             "quota": {"enforced": True, "daily_limit": 2},
             "model_defaults": {
-                "chat_main": {"temperature": 0.3, "max_tokens": 128, "thinking": False}
+                "chat_main": {"temperature": 0.3, "max_tokens": 128, "top_p": 0.7, "thinking": True}
             },
         },
         actor="admin-1",
@@ -40,8 +40,17 @@ async def test_update_quota_and_model_defaults() -> None:
     assert service.quota_config() == (True, 2)
     override = service.model_override("chat_main")
     assert override is not None and override["temperature"] == 0.3
+    assert override["top_p"] == 0.7
+    assert override["thinking"] is True
     assert len(repo.audits) == 1
     assert repo.audits[0]["actor"] == "admin-1"
+
+
+async def test_invalid_top_p_is_rejected() -> None:
+    service, _ = build()
+    await service.load()
+    with pytest.raises(InvalidInput):
+        await service.update({"model_defaults": {"chat_main": {"top_p": 1.5}}}, actor="a")
 
 
 async def test_invalid_temperature_is_rejected() -> None:

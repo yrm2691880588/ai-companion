@@ -131,7 +131,7 @@ class ModelRouter:
                     pass
         first = calls[0]
         merged_params = dict(first.step.params)
-        for field in ("temperature", "max_tokens", "thinking", "json_mode"):
+        for field in ("temperature", "max_tokens", "top_p", "thinking", "json_mode"):
             if field in override and override[field] is not None:
                 merged_params[field] = override[field]
         calls[0] = PlannedCall(
@@ -171,9 +171,11 @@ class ModelRouter:
     # ---------- 调用 ----------
     def _params(self, call: PlannedCall, override: ChatParams | None) -> ChatParams:
         raw = call.step.params
+        top_p_raw = raw.get("top_p")
         params = ChatParams(
             temperature=_as_float(raw.get("temperature"), 0.8),
             max_tokens=min(_as_int(raw.get("max_tokens"), 512), call.spec.max_output),
+            top_p=float(top_p_raw) if isinstance(top_p_raw, (int, float)) else None,
             thinking=bool(raw.get("thinking", False)),
             json_mode=bool(raw.get("json_mode", False)),
         )
@@ -184,6 +186,7 @@ class ModelRouter:
             if override.temperature is not None
             else params.temperature,
             max_tokens=override.max_tokens or params.max_tokens,
+            top_p=override.top_p if override.top_p is not None else params.top_p,
             thinking=override.thinking or params.thinking,
             json_mode=override.json_mode or params.json_mode,
             extra={**params.extra, **override.extra},

@@ -127,6 +127,14 @@ export default function AdminSettingsCard() {
                 value={item.max_tokens}
                 onChange={(event) => patchTask(task, { max_tokens: Number(event.target.value) })}
               />
+              <input
+                type="number"
+                step="0.05"
+                min={0}
+                max={1}
+                value={item.top_p ?? 0.95}
+                onChange={(event) => patchTask(task, { top_p: Number(event.target.value) })}
+              />
               <label className="muted" style={{ alignSelf: "center" }}>
                 <input
                   type="checkbox"
@@ -137,7 +145,8 @@ export default function AdminSettingsCard() {
               </label>
             </div>
             <p className="muted">
-              温度 {item.temperature} · 最大输出 {item.max_tokens} tokens
+              温度 {item.temperature} · top_p {item.top_p ?? 0.95} · 最大输出 {item.max_tokens}{" "}
+              tokens
             </p>
           </div>
         );

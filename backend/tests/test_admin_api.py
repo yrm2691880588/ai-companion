@@ -52,11 +52,26 @@ def test_admin_can_read_and_update_settings() -> None:
         "/v1/admin/settings",
         json={
             "quota": {"enforced": True, "daily_limit": 2},
-            "model_defaults": {"chat_main": {"temperature": 0.3, "max_tokens": 128}},
+            "model_defaults": {
+                "chat_main": {
+                    "temperature": 0.3,
+                    "max_tokens": 128,
+                    "top_p": 0.7,
+                    "thinking": True,
+                }
+            },
         },
     )
     assert updated.status_code == 200
+    chat_main = updated.json()["settings"]["model_defaults"]["chat_main"]
+    assert chat_main["temperature"] == 0.3
+    assert chat_main["top_p"] == 0.7
+    assert chat_main["thinking"] is True
     assert updated.json()["settings"]["quota"]["enforced"] is True
+
+    reloaded = admin.get("/v1/admin/settings").json()["settings"]["model_defaults"]["chat_main"]
+    assert reloaded["top_p"] == 0.7
+    assert reloaded["thinking"] is True
 
     quota = admin.get("/v1/me/quota").json()
     assert quota["enforced"] is True
@@ -64,6 +79,18 @@ def test_admin_can_read_and_update_settings() -> None:
 
     audit = admin.get("/v1/admin/audit").json()
     assert audit and audit[0]["action"] == "settings.update"
+
+
+def test_admin_rejects_invalid_top_p() -> None:
+    repo = InMemoryAuthRepository()
+    settings_repo = InMemorySystemSettingsRepository()
+    admin = build_client("13800001234", repo, settings_repo, admin_phones="13800001234")
+    login(admin, "13800001234")
+    response = admin.put(
+        "/v1/admin/settings",
+        json={"model_defaults": {"chat_main": {"top_p": 1.5}}},
+    )
+    assert response.status_code == 422
 
 
 def test_normal_user_cannot_access_admin() -> None:

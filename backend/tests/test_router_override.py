@@ -12,9 +12,11 @@ REG = ModelRegistry.from_presets(env={})
 class FakeGateway:
     def __init__(self) -> None:
         self.calls: list[object] = []
+        self.last_params: object | None = None
 
     async def astream(self, provider, spec, messages, params, *, telemetry=None):  # type: ignore[no-untyped-def]
         self.calls.append(spec)
+        self.last_params = params
         yield ChatChunk(delta="ok", model_key=spec.key)
 
 
@@ -38,6 +40,14 @@ def test_override_applies_params_to_primary() -> None:
     params = plan[0].step.params
     assert params["temperature"] == 0.1
     assert params["max_tokens"] == 64
+
+
+def test_override_applies_top_p_thinking_and_json_mode() -> None:
+    plan = router({"top_p": 0.7, "thinking": True, "json_mode": True}).plan(TaskName.CHAT_MAIN)
+    params = plan[0].step.params
+    assert params["top_p"] == 0.7
+    assert params["thinking"] is True
+    assert params["json_mode"] is True
 
 
 def test_unknown_override_model_is_ignored() -> None:
@@ -66,3 +76,32 @@ async def test_override_model_is_used_for_stream() -> None:
     ]
     assert chunks
     assert chunks[0].model_key == "deepseek:deepseek-v4-pro"
+
+
+async def test_stream_applies_override_params() -> None:
+    gw = FakeGateway()
+    router_instance = ModelRouter(
+        REG,
+        gw,  # type: ignore[arg-type]
+        clock=lambda: datetime(2026, 10, 26, 10, 0, tzinfo=SHANGHAI),
+        overrides=lambda task: {
+            "temperature": 0.2,
+            "max_tokens": 64,
+            "top_p": 0.6,
+            "thinking": True,
+            "json_mode": False,
+        },
+    )
+    _ = [
+        chunk
+        async for chunk in router_instance.stream(
+            TaskName.CHAT_MAIN, [Message(role=Role.USER, content="hi")]
+        )
+    ]
+    params = gw.last_params
+    assert params is not None
+    assert params.temperature == 0.2
+    assert params.max_tokens == 64
+    assert params.top_p == 0.6
+    assert params.thinking is True
+    assert params.json_mode is False

@@ -72,6 +72,7 @@ class ChatChunk:
 class ChatParams:
     temperature: float | None = None
     max_tokens: int | None = None
+    top_p: float | None = None
     thinking: bool = False
     json_mode: bool = False
     extra: dict[str, object] = field(default_factory=dict)

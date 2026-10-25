@@ -14,7 +14,7 @@ from app.core.errors import InvalidInput
 
 SETTINGS_KEY = "app"
 ALLOWED_TASKS = ("chat_main", "persona_generate")
-ALLOWED_FIELDS = ("model", "temperature", "max_tokens", "thinking", "json_mode")
+ALLOWED_FIELDS = ("model", "temperature", "max_tokens", "top_p", "thinking", "json_mode")
 
 DEFAULT_SETTINGS: dict[str, object] = {
     "quota": {"enforced": False, "daily_limit": 60},
@@ -23,6 +23,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
             "model": "",
             "temperature": 0.8,
             "max_tokens": 512,
+            "top_p": 0.95,
             "thinking": False,
             "json_mode": False,
         },
@@ -30,6 +31,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
             "model": "",
             "temperature": 0.6,
             "max_tokens": 1200,
+            "top_p": 0.95,
             "thinking": False,
             "json_mode": True,
         },
@@ -182,6 +184,10 @@ class SystemSettingsService:
             if max_tokens is not None:
                 if not isinstance(max_tokens, int) or not 32 <= max_tokens <= 4096:
                     raise InvalidInput("max_tokens 必须在 32–4096 之间", code="SETTINGS_INVALID")
+            top_p = item.get("top_p")
+            if top_p is not None:
+                if not isinstance(top_p, (int, float)) or not 0 <= float(top_p) <= 1:
+                    raise InvalidInput("top_p 必须在 0–1 之间", code="SETTINGS_INVALID")
             for flag in ("thinking", "json_mode"):
                 if flag in item and not isinstance(item[flag], bool):
                     raise InvalidInput(f"{flag} 必须是布尔值", code="SETTINGS_INVALID")
