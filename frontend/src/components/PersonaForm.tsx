@@ -55,11 +55,11 @@ export default function PersonaForm({ value, onChange, disabled }: Props) {
           </select>
         </div>
         <div>
-          <label htmlFor="p-age">年龄（16–99）</label>
+          <label htmlFor="p-age">年龄（18–99）</label>
           <input
             id="p-age"
             type="number"
-            min={16}
+            min={18}
             max={99}
             disabled={disabled}
             value={value.age ?? ""}

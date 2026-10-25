@@ -39,7 +39,9 @@ export default function LoginPage() {
   return (
     <div style={{ maxWidth: 420, margin: "40px auto" }}>
       <h1>登录</h1>
-      <p className="muted">用手机号 + 验证码登录；开发模式下验证码会直接显示，不会真的发短信。</p>
+      <p className="muted">
+        用手机号 + 验证码登录；开发模式下验证码会直接显示，不会真的发短信。本产品面向 18 岁以上用户。
+      </p>
 
       {error && <div className="alert">{error}</div>}
 

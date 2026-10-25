@@ -21,7 +21,7 @@ CURRENT_SCHEMA_VERSION = 1
 GENDERS = ("女", "男", "其他", "不设定")
 MAX_NAME = 20
 MAX_FIELD = 60
-MIN_AGE = 16
+MIN_AGE = 18
 MAX_AGE = 99
 KO = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
