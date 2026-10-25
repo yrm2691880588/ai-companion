@@ -160,13 +160,33 @@ export interface Quota {
   used: number;
   limit: number;
   remaining: number;
+  enforced: boolean;
 }
 
 export interface Account {
   user_id: string;
   account_id?: number | null;
   phone_masked?: string | null;
+  role?: string;
   created_at?: string | null;
+}
+
+export interface ModelDefaults {
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  thinking: boolean;
+  json_mode?: boolean;
+}
+
+export interface AdminSettings {
+  quota: { enforced: boolean; daily_limit: number };
+  model_defaults: Record<string, ModelDefaults>;
+}
+
+export interface AdminSettingsResponse {
+  settings: AdminSettings;
+  models: { key: string; display_name: string; provider: string }[];
 }
 
 export interface SmsCodeResponse {

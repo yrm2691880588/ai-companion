@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import me_router as me_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
@@ -31,6 +32,11 @@ from app.domain.memory import MemoryRepository, MemoryService
 from app.domain.quota import QuotaRepository, QuotaService
 from app.domain.roleplay import SCENARIOS, RoleplayService, RunRepository, ScenarioRepository
 from app.domain.safety import SafetyEventRepository
+from app.domain.system_settings import (
+    InMemorySystemSettingsRepository,
+    SystemSettingsRepository,
+    SystemSettingsService,
+)
 from app.domain.templates import TEMPLATES, TemplateRepository
 from app.domain.usage import UsageRepository
 from app.infra.auth_repo import SqlAuthRepository
@@ -46,6 +52,7 @@ from app.infra.memory_repo import SqlMemoryRepository
 from app.infra.quota_repo import SqlQuotaRepository
 from app.infra.roleplay_repo import SqlRunRepository, SqlSafetyRepository, SqlScenarioRepository
 from app.infra.summary_repo import SqlSummaryRepository, SummaryRepository
+from app.infra.system_settings_repo import SqlSystemSettingsRepository
 from app.infra.template_repo import SqlTemplateRepository
 from app.infra.usage_repo import SqlUsageRepository
 
@@ -75,6 +82,7 @@ def create_app(
     quota_repo: QuotaRepository | None = None,
     auth_repo: AuthRepository | None = None,
     deletion_repo: DeletionRepository | None = None,
+    system_settings_repo: SystemSettingsRepository | None = None,
 ) -> FastAPI:
     resolved = settings or get_settings()
     registry = ModelRegistry.from_presets(keys=resolved.provider_keys())
@@ -93,10 +101,20 @@ def create_app(
     runs_store: RunRepository = run_repo or SqlRunRepository(session_factory)
     safety_store: SafetyEventRepository = safety_repo or SqlSafetyRepository(session_factory)
     quotas_store: QuotaRepository = quota_repo or SqlQuotaRepository(session_factory)
-    quota_service = QuotaService(quotas_store, daily_limit=resolved.daily_turn_limit)
+    settings_store: SystemSettingsRepository = system_settings_repo or (
+        InMemorySystemSettingsRepository()
+        if resolved.env == "test"
+        else SqlSystemSettingsRepository(session_factory)
+    )
+    system_settings = SystemSettingsService(settings_store)
+    quota_enforced, quota_limit = system_settings.quota_config()
+    quota_service = QuotaService(quotas_store, daily_limit=quota_limit, enforced=quota_enforced)
     auth_store: AuthRepository = auth_repo or SqlAuthRepository(session_factory)
     auth_service = AuthService(
-        auth_store, sms_debug=resolved.sms_debug, session_days=resolved.session_days
+        auth_store,
+        sms_debug=resolved.sms_debug,
+        session_days=resolved.session_days,
+        admin_phones=resolved.admin_phone_set,
     )
     deletions_store: DeletionRepository = deletion_repo or SqlDeletionRepository(session_factory)
     deletion_service = DeletionService(deletions_store)
@@ -108,6 +126,7 @@ def create_app(
         expected_output_tokens=resolved.expected_output_tokens,
         max_context_ratio=resolved.max_context_ratio,
         recorder=usage_store,
+        overrides=system_settings.model_override,
     )
     client: LLMClient = llm_client or RouterLLMClient(router, registry)
     companion_service = CompanionService(companions_store, client, templates_store)
@@ -142,6 +161,12 @@ def create_app(
             await scenarios_store.sync(SCENARIOS)
         except Exception:  # 数据库未就绪时不要让应用起不来
             _LOG.warning("官方模板/演练场景同步失败（可稍后重试）", exc_info=True)
+        try:
+            await system_settings.load()
+            enforced, limit = system_settings.quota_config()
+            quota_service.configure(enforced=enforced, daily_limit=limit)
+        except Exception:
+            _LOG.warning("系统设置加载失败，使用默认值", exc_info=True)
         yield
         await engine.dispose()
 
@@ -165,6 +190,7 @@ def create_app(
     app.state.quota_service = quota_service
     app.state.auth_service = auth_service
     app.state.deletion_service = deletion_service
+    app.state.system_settings = system_settings
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
     app.include_router(models_router)
     app.include_router(usage_router)
@@ -176,6 +202,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(export_router)
+    app.include_router(admin_router)
     app.include_router(chat_router)
     app.include_router(memories_router)
 

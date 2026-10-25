@@ -1,8 +1,9 @@
-"""登录：手机验证码 + 会话令牌（Cookie）。
+"""登录：手机验证码 + 会话令牌（Cookie）+ 管理员角色。
 
 - 验证码 6 位、5 分钟有效、60 秒内不可重复发送、最多试 5 次；
 - 会话令牌随机 32 字节，数据库只存 SHA-256；
-- 开发模式可以把验证码直接返回（sms_debug），生产接短信服务商。
+- 开发模式可以把验证码直接返回（sms_debug），生产接短信服务商；
+- 管理员通过 AI_COMPANION_ADMIN_PHONES 配置手机号，登录时自动授予 admin。
 """
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ class AccountRecord:
     id: int
     phone: str
     nickname: str = ""
+    role: str = "user"
     created_at: datetime | None = None
 
 
@@ -77,6 +79,8 @@ class AuthRepository(Protocol):
     async def find_account_by_id(self, account_id: int) -> AccountRecord | None: ...
 
     async def create_account(self, phone: str) -> AccountRecord: ...
+
+    async def update_role(self, account_id: int, role: str) -> None: ...
 
     async def latest_code(self, phone: str) -> CodeRecord | None: ...
 
@@ -112,10 +116,17 @@ class InMemoryAuthRepository:
         return next((item for item in self.accounts.values() if item.id == account_id), None)
 
     async def create_account(self, phone: str) -> AccountRecord:
-        record = AccountRecord(id=self._next_account_id, phone=phone, created_at=datetime.now(UTC))
+        record = AccountRecord(
+            id=self._next_account_id, phone=phone, role="user", created_at=datetime.now(UTC)
+        )
         self.accounts[phone] = record
         self._next_account_id += 1
         return record
+
+    async def update_role(self, account_id: int, role: str) -> None:
+        for item in self.accounts.values():
+            if item.id == account_id:
+                item.role = role
 
     async def latest_code(self, phone: str) -> CodeRecord | None:
         matches = [item for item in self.codes if item.phone == phone and not item.used]
@@ -173,11 +184,13 @@ class AuthService:
         sms_debug: bool = True,
         code_ttl_seconds: int = CODE_TTL_SECONDS,
         session_days: int = SESSION_DAYS,
+        admin_phones: set[str] | None = None,
     ) -> None:
         self._repo = repo
         self.sms_debug = sms_debug
         self._code_ttl = code_ttl_seconds
         self._session_days = session_days
+        self._admin_phones = {item.strip() for item in (admin_phones or set()) if item.strip()}
 
     async def request_code(self, phone: str) -> tuple[str, datetime]:
         normalized = normalize_phone(phone)
@@ -212,6 +225,9 @@ class AuthService:
         account = await self._repo.find_account(normalized) or await self._repo.create_account(
             normalized
         )
+        if normalized in self._admin_phones and account.role != "admin":
+            await self._repo.update_role(account.id, "admin")
+            account.role = "admin"
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + timedelta(days=self._session_days)
         await self._repo.create_session(account.id, hash_token(token), expires_at)
@@ -230,3 +246,7 @@ class AuthService:
 
     async def me(self, account_id: int) -> AccountRecord | None:
         return await self._repo.find_account_by_id(account_id)
+
+    async def is_admin(self, account_id: int) -> bool:
+        account = await self._repo.find_account_by_id(account_id)
+        return account is not None and account.role == "admin"

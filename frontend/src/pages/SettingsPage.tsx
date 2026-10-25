@@ -1,12 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getUserId, setUserId } from "../api";
-import type { Account, Provider, UsageSummary } from "../types";
+import type {
+  Account,
+  AdminSettingsResponse,
+  ModelDefaults,
+  Provider,
+  UsageSummary,
+} from "../types";
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
+  const [admin, setAdmin] = useState<AdminSettingsResponse | null>(null);
+  const [adminSaved, setAdminSaved] = useState(false);
+  const [adminError, setAdminError] = useState("");
   const [user, setUser] = useState(getUserId());
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -22,6 +31,9 @@ export default function SettingsPage() {
         setProviders(list);
         setUsage(summary);
         setAccount(me);
+        if (me?.role === "admin") {
+          setAdmin(await api.adminSettings());
+        }
       } catch (event) {
         setError((event as Error).message);
       }
@@ -32,8 +44,39 @@ export default function SettingsPage() {
     try {
       await api.logout();
       setAccount(null);
+      setAdmin(null);
     } catch (event) {
       setError((event as Error).message);
+    }
+  }
+
+  function patchTask(task: string, patch: Partial<ModelDefaults>) {
+    setAdmin((prev) => {
+      if (!prev) return prev;
+      const current = prev.settings.model_defaults[task];
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          model_defaults: {
+            ...prev.settings.model_defaults,
+            [task]: { ...current, ...patch },
+          },
+        },
+      };
+    });
+  }
+
+  async function saveAdmin() {
+    if (!admin) return;
+    setAdminError("");
+    try {
+      const result = await api.adminUpdate(admin.settings);
+      setAdmin(result);
+      setAdminSaved(true);
+      window.setTimeout(() => setAdminSaved(false), 1500);
+    } catch (event) {
+      setAdminError((event as Error).message);
     }
   }
 
@@ -65,6 +108,113 @@ export default function SettingsPage() {
           导出我的数据（JSON）
         </a>
       </div>
+
+      {account?.role === "admin" && admin && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h2>管理员设置</h2>
+          <p className="muted">统一控制额度开关与默认模型参数；普通用户看不到这一块。</p>
+          {adminError && <div className="alert">{adminError}</div>}
+          <label className="muted">
+            <input
+              type="checkbox"
+              checked={admin.settings.quota.enforced}
+              onChange={(event) =>
+                setAdmin({
+                  ...admin,
+                  settings: {
+                    ...admin.settings,
+                    quota: { ...admin.settings.quota, enforced: event.target.checked },
+                  },
+                })
+              }
+            />{" "}
+            启用每日额度（关闭时仍记录轮次，供稳定性测试观察）
+          </label>
+          <div className="composer" style={{ marginTop: 8 }}>
+            <label className="muted" style={{ alignSelf: "center" }}>
+              每日上限
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              value={admin.settings.quota.daily_limit}
+              onChange={(event) =>
+                setAdmin({
+                  ...admin,
+                  settings: {
+                    ...admin.settings,
+                    quota: {
+                      ...admin.settings.quota,
+                      daily_limit: Number(event.target.value),
+                    },
+                  },
+                })
+              }
+            />
+          </div>
+
+          {(["chat_main", "persona_generate"] as const).map((task) => {
+            const item = admin.settings.model_defaults[task];
+            const label = task === "chat_main" ? "日常对话" : "人设生成";
+            return (
+              <div key={task} style={{ marginTop: 14 }}>
+                <h3>{label}</h3>
+                <div className="composer">
+                  <select
+                    value={item.model}
+                    onChange={(event) => patchTask(task, { model: event.target.value })}
+                  >
+                    <option value="">跟随系统路由</option>
+                    {admin.models.map((model) => (
+                      <option key={model.key} value={model.key}>
+                        {model.display_name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    max={2}
+                    value={item.temperature}
+                    onChange={(event) =>
+                      patchTask(task, { temperature: Number(event.target.value) })
+                    }
+                  />
+                  <input
+                    type="number"
+                    min={32}
+                    max={4096}
+                    value={item.max_tokens}
+                    onChange={(event) =>
+                      patchTask(task, { max_tokens: Number(event.target.value) })
+                    }
+                  />
+                  <label className="muted" style={{ alignSelf: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={item.thinking}
+                      onChange={(event) => patchTask(task, { thinking: event.target.checked })}
+                    />{" "}
+                    思考模式
+                  </label>
+                </div>
+                <p className="muted">
+                  温度 {item.temperature} · 最大输出 {item.max_tokens} tokens
+                </p>
+              </div>
+            );
+          })}
+
+          <div className="toolbar">
+            <button className="primary" onClick={() => void saveAdmin()}>
+              保存管理员设置
+            </button>
+            {adminSaved && <span className="muted">已保存</span>}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 12 }}>
         <h2>开发用户</h2>

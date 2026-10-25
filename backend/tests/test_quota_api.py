@@ -6,6 +6,7 @@ from app.core.config import Settings
 from app.domain.chat import InMemoryChatRepository
 from app.domain.companions import InMemoryCompanionRepository, LLMResult
 from app.domain.quota import InMemoryQuotaRepository
+from app.domain.system_settings import InMemorySystemSettingsRepository
 from app.domain.templates import TEMPLATES, InMemoryTemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import ChatChunk, Usage
@@ -36,20 +37,24 @@ class FakeStreamer:
 
 
 def client(limit: int) -> TestClient:
+    settings_repo = InMemorySystemSettingsRepository()
+    settings_repo.value = {"quota": {"enforced": True, "daily_limit": limit}}
     settings = Settings(  # type: ignore[call-arg]
         env="test", _env_file=None, daily_turn_limit=limit
     )
-    return TestClient(
-        create_app(
-            settings,
-            companion_repo=InMemoryCompanionRepository(),
-            template_repo=InMemoryTemplateRepository(TEMPLATES),
-            chat_repo=InMemoryChatRepository(),
-            chat_streamer=FakeStreamer(),
-            llm_client=FakeLLM(),
-            quota_repo=InMemoryQuotaRepository(),
-        )
+    app = create_app(
+        settings,
+        companion_repo=InMemoryCompanionRepository(),
+        template_repo=InMemoryTemplateRepository(TEMPLATES),
+        chat_repo=InMemoryChatRepository(),
+        chat_streamer=FakeStreamer(),
+        llm_client=FakeLLM(),
+        quota_repo=InMemoryQuotaRepository(),
+        system_settings_repo=settings_repo,
     )
+    # TestClient 不以上下文管理器使用时不会触发 lifespan，这里手动应用配置
+    app.state.quota_service.configure(enforced=True, daily_limit=limit)
+    return TestClient(app)
 
 
 def prepare(test_client: TestClient) -> int:

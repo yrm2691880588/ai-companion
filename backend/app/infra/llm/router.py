@@ -69,6 +69,7 @@ class ModelRouter:
         max_context_ratio: float = 0.8,
         clock: Callable[[], datetime] | None = None,
         recorder: UsageRecorder | None = None,
+        overrides: Callable[[str], dict[str, object] | None] | None = None,
     ) -> None:
         self.registry = registry
         self.gateway = gateway
@@ -78,6 +79,7 @@ class ModelRouter:
         self.max_context_ratio = max_context_ratio
         self._clock = clock or (lambda: datetime.now().astimezone())
         self._recorder = recorder
+        self._overrides = overrides
 
     # ---------- 规划 ----------
     def band(self) -> TimeBand:
@@ -94,6 +96,49 @@ class ModelRouter:
             spec = self.registry.model(step.model_key)
             provider = self.registry.provider(spec.provider_key)
             calls.append(PlannedCall(step=step, spec=spec, provider=provider))
+        return self._apply_override(task, calls)
+
+    def _apply_override(self, task: TaskName | str, calls: list[PlannedCall]) -> list[PlannedCall]:
+        """管理员统一配置：指定模型优先、参数覆盖主模型。"""
+        if self._overrides is None or not calls:
+            return calls
+        task_key = task.value if isinstance(task, TaskName) else str(task)
+        try:
+            override = self._overrides(task_key)
+        except Exception:
+            override = None
+        if not override:
+            return calls
+        model_key = str(override.get("model") or "")
+        if model_key:
+            matching = [item for item in calls if item.spec.key == model_key]
+            rest = [item for item in calls if item.spec.key != model_key]
+            if matching:
+                calls = matching + rest
+            elif model_key in self.registry.models:
+                try:
+                    spec = self.registry.model(model_key)
+                    provider = self.registry.provider(spec.provider_key)
+                    calls = [
+                        PlannedCall(
+                            step=RouteStep(model_key=model_key, params={}),
+                            spec=spec,
+                            provider=provider,
+                        ),
+                        *calls,
+                    ]
+                except KeyError:
+                    pass
+        first = calls[0]
+        merged_params = dict(first.step.params)
+        for field in ("temperature", "max_tokens", "thinking", "json_mode"):
+            if field in override and override[field] is not None:
+                merged_params[field] = override[field]
+        calls[0] = PlannedCall(
+            step=RouteStep(model_key=first.spec.key, params=merged_params),
+            spec=first.spec,
+            provider=first.provider,
+        )
         return calls
 
     def budget(self, spec: ModelSpec, *, band: TimeBand | None = None) -> int:

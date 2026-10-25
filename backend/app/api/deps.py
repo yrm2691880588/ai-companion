@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 from app.domain.auth import COOKIE_NAME, AuthService
 from app.domain.chat import ChatService
@@ -79,3 +79,14 @@ def get_deletion_service(request: Request) -> DeletionService:
     if not isinstance(service, DeletionService):
         raise HTTPException(status_code=503, detail="删除服务尚未初始化")
     return service
+
+
+async def require_admin(request: Request, user_id: str = Depends(get_current_user_id)) -> str:
+    service = getattr(request.app.state, "auth_service", None)
+    if isinstance(service, AuthService) and user_id.isdigit():
+        if await service.is_admin(int(user_id)):
+            return user_id
+    raise HTTPException(
+        status_code=403,
+        detail={"code": "FORBIDDEN", "message": "需要管理员权限"},
+    )

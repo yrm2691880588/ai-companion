@@ -63,13 +63,28 @@ class InMemoryQuotaRepository:
 
 
 class QuotaService:
-    def __init__(self, repo: QuotaRepository, *, daily_limit: int = 60) -> None:
+    def __init__(
+        self,
+        repo: QuotaRepository,
+        *,
+        daily_limit: int = 60,
+        enforced: bool = True,
+    ) -> None:
         self._repo = repo
         self._limit = max(daily_limit, 1)
+        self._enforced = enforced
 
     @property
     def limit(self) -> int:
         return self._limit
+
+    @property
+    def enforced(self) -> bool:
+        return self._enforced
+
+    def configure(self, *, enforced: bool, daily_limit: int) -> None:
+        self._enforced = enforced
+        self._limit = max(daily_limit, 1)
 
     async def status(self, user_id: str) -> QuotaState:
         day = today_in_shanghai()
@@ -78,7 +93,7 @@ class QuotaService:
 
     async def ensure_available(self, user_id: str) -> QuotaState:
         state = await self.status(user_id)
-        if state.used >= state.limit:
+        if self._enforced and state.used >= state.limit:
             raise AppError(
                 code="QUOTA_EXCEEDED",
                 message=f"今天的 {state.limit} 轮已经用完，明天再来吧",
@@ -89,8 +104,9 @@ class QuotaService:
 
     async def consume(self, user_id: str) -> QuotaState:
         day = today_in_shanghai()
+        limit = self._limit if self._enforced else 10_000_000
         try:
-            used = await self._repo.consume(user_id, day, self._limit)
+            used = await self._repo.consume(user_id, day, limit)
         except ValueError as exc:
             raise AppError(
                 code="QUOTA_EXCEEDED",

@@ -40,6 +40,7 @@ class MeOut(BaseModel):
     user_id: str
     account_id: int | None = None
     phone_masked: str | None = None
+    role: str = "user"
     created_at: datetime | None = None
 
 
@@ -109,6 +110,7 @@ async def me(
                 user_id=user_id,
                 account_id=account.id,
                 phone_masked=mask_phone(account.phone),
+                role=account.role,
                 created_at=account.created_at,
             )
     return MeOut(user_id=user_id)

@@ -29,10 +29,17 @@ class SqlAuthRepository:
 
     async def create_account(self, phone: str) -> AccountRecord:
         async with self._session_factory() as session:
-            row = Account(phone=phone)
+            row = Account(phone=phone, role="user")
             session.add(row)
             await session.commit()
             return _to_account(row)
+
+    async def update_role(self, account_id: int, role: str) -> None:
+        async with self._session_factory() as session:
+            row = await session.get(Account, account_id)
+            if row is not None:
+                row.role = role
+                await session.commit()
 
     async def latest_code(self, phone: str) -> CodeRecord | None:
         async with self._session_factory() as session:
@@ -112,7 +119,11 @@ class SqlAuthRepository:
 
 def _to_account(row: Account) -> AccountRecord:
     return AccountRecord(
-        id=row.id, phone=row.phone, nickname=row.nickname, created_at=row.created_at
+        id=row.id,
+        phone=row.phone,
+        nickname=row.nickname,
+        role=row.role or "user",
+        created_at=row.created_at,
     )
 
 

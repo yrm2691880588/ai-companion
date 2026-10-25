@@ -19,6 +19,7 @@ class QuotaOut(BaseModel):
     used: int
     limit: int
     remaining: int
+    enforced: bool = True
 
 
 def get_quota_service(request: Request) -> QuotaService:
@@ -34,4 +35,10 @@ async def get_quota(
     service: Annotated[QuotaService, Depends(get_quota_service)],
 ) -> QuotaOut:
     state = await service.status(user_id)
-    return QuotaOut(day=state.day, used=state.used, limit=state.limit, remaining=state.remaining)
+    return QuotaOut(
+        day=state.day,
+        used=state.used,
+        limit=state.limit,
+        remaining=state.remaining,
+        enforced=service.enforced,
+    )

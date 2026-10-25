@@ -161,11 +161,14 @@ export default function ChatPage() {
           <p className="muted">
             {companion ? `${companion.persona.identity} · 人设 v${companion.current_version}` : "加载中…"}
           </p>
-          {quota && (
-            <span className="chip">
-              今日剩余 {quota.remaining}/{quota.limit} 轮
-            </span>
-          )}
+          {quota &&
+            (quota.enforced ? (
+              <span className="chip">
+                今日剩余 {quota.remaining}/{quota.limit} 轮
+              </span>
+            ) : (
+              <span className="chip">额度管控已暂停 · 稳定性测试中</span>
+            ))}
         </div>
         <div className="toolbar">
           <Link className="btn ghost" to={`/companions/${companionId}/memories`}>
@@ -178,7 +181,7 @@ export default function ChatPage() {
       </div>
 
       {error && <div className="alert">{error}</div>}
-      {quota && quota.remaining <= 0 && (
+      {quota?.enforced && quota.remaining <= 0 && (
         <div className="notice">今天的额度用完了，明天再来聊吧。</div>
       )}
 

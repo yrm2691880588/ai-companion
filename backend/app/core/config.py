@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # 登录：开发模式可回显验证码；生产接短信服务商后关闭
     sms_debug: bool = True
     session_days: int = 7
+    # 管理员手机号（逗号分隔），登录时自动授予 admin
+    admin_phones: str = ""
+
+    @property
+    def admin_phone_set(self) -> set[str]:
+        return {item.strip() for item in self.admin_phones.split(",") if item.strip()}
 
     # 供应商密钥（.env 里配置；不打印、不返回）
     deepseek_api_key: str = ""

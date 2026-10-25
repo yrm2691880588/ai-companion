@@ -16,6 +16,7 @@ class Account(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     phone: Mapped[str] = mapped_column(String(20), unique=True)
     nickname: Mapped[str] = mapped_column(String(40), default="")
+    role: Mapped[str] = mapped_column(String(16), default="user")
     status: Mapped[str] = mapped_column(String(16), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

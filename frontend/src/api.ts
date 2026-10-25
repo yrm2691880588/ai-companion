@@ -1,5 +1,7 @@
 import type {
   Account,
+  AdminSettings,
+  AdminSettingsResponse,
   Companion,
   LoginResponse,
   Memory,
@@ -243,5 +245,14 @@ export const api = {
   },
   async quota(): Promise<Quota> {
     return request<Quota>("/v1/me/quota");
+  },
+  async adminSettings(): Promise<AdminSettingsResponse> {
+    return request<AdminSettingsResponse>("/v1/admin/settings");
+  },
+  async adminUpdate(patch: Partial<AdminSettings>): Promise<AdminSettingsResponse> {
+    return request<AdminSettingsResponse>("/v1/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
   },
 };
