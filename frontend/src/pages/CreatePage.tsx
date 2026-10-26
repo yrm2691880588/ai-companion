@@ -73,7 +73,7 @@ export default function CreatePage() {
       <p className="muted">一句话描述，或从模板开始；生成后可以逐项修改。</p>
 
       <div className="toolbar">
-        <PersonaImportButton />
+        <PersonaImportButton onCreated={(created) => navigate(`/companions/${created.id}/chat`)} />
         <button
           className={mode === "draft" ? "primary" : "ghost"}
           onClick={() => setMode("draft")}
@@ -164,6 +164,7 @@ export default function CreatePage() {
     </div>
   );
 }
+
 
 
 

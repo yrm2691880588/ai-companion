@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
 import { track } from "../analytics";
-import type { Companion, Message, Quota, Session } from "../types";
+import type { Companion, Message, Session } from "../types";
 
 const STICK_THRESHOLD = 80;
 
@@ -49,7 +49,7 @@ export default function ChatPage() {
   const [showJump, setShowJump] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [quota, setQuota] = useState<Quota | null>(null);
+
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [confirm, setConfirm] = useState<
@@ -77,7 +77,7 @@ export default function ChatPage() {
         setCompanion(loaded);
         setSessions(list);
         if (list.length > 0) await selectSession(list[0].id);
-        setQuota(await api.quota());
+
       } catch (event) {
         setError((event as Error).message);
       }
@@ -182,7 +182,7 @@ export default function ChatPage() {
                 setEcho({ messageId: list[list.length - 1].id, items: data.memories });
               }
               setSessions(await api.sessions(companionId));
-              setQuota(await api.quota());
+      
             })();
           },
         },
@@ -232,7 +232,7 @@ export default function ChatPage() {
           onDone: () => {
             void (async () => {
               setMessages(await api.messages(sessionId));
-              setQuota(await api.quota());
+      
             })();
           },
         },
@@ -357,17 +357,12 @@ export default function ChatPage() {
                 ? `${companion.persona.relationship || companion.persona.identity} · 人设 v${companion.current_version}`
                 : "加载中…"}
             </p>
-            {quota &&
-              (quota.enforced ? (
-                <span className="chip">
-                  今日剩余 {quota.remaining}/{quota.limit} 轮
-                </span>
-              ) : (
-                <span className="chip">额度管控已暂停 · 稳定性测试中</span>
-              ))}
           </div>
         </div>
         <div className="toolbar">
+          <Link className="btn ghost" to={`/companions/${companionId}/persona`}>
+            人设
+          </Link>
           <Link className="btn ghost" to={`/companions/${companionId}/memories`}>
             记忆
           </Link>
@@ -379,9 +374,7 @@ export default function ChatPage() {
 
       {error && <div className="alert">{error}</div>}
       {notice && <div className="toast">{notice}</div>}
-      {quota?.enforced && quota.remaining <= 0 && (
-        <div className="notice">今天的额度用完了，明天再来聊吧。</div>
-      )}
+
 
       <div className="chat-layout" style={{ marginTop: 12 }}>
         <aside>
@@ -591,6 +584,8 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
 
 
 

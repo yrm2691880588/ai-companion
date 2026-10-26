@@ -938,3 +938,14 @@ label {
   color: var(--muted);
   line-height: 1.6;
 }
+
+/* ---------- 导入预览 ---------- */
+.import-modal {
+  width: min(720px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.import-form .field-grid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}

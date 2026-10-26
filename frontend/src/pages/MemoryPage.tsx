@@ -67,7 +67,12 @@ export default function MemoryPage() {
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
           <h1>她记得的事</h1>
-          <p className="muted">{companion ? `${companion.name} 记住的关于你的事` : "加载中…"}</p>
+          <p className="muted">
+            {companion ? `${companion.name} 记住的关于你的事` : "加载中…"}
+          </p>
+          <p className="muted">
+            聊天时她会自动参考这里的内容；记错了可以删掉，删掉后就不再使用。
+          </p>
         </div>
         <div className="toolbar">
           <Link className="btn ghost" to={`/companions/${companionId}/chat`}>
@@ -115,3 +120,4 @@ export default function MemoryPage() {
     </div>
   );
 }
+

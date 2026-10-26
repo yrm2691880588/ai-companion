@@ -114,6 +114,51 @@ check(
   "创建页有导入人设入口",
   (await page.getByRole("button", { name: "导入人设" }).count()) > 0,
 );
+
+// 导入必须先预览、可修改，确认后才创建
+const beforeImport = await page.evaluate(async () => {
+  const response = await fetch("/v1/companions", { credentials: "same-origin" });
+  return (await response.json()).length;
+});
+const importJson = JSON.stringify({
+  format: "ai-companion-persona",
+  version: 1,
+  persona: {
+    name: "导入预览测试",
+    identity: "图书管理员",
+    gender: "女",
+    age: 28,
+    personality: ["安静", "耐心"],
+    speaking_style: "句子短，语速慢，喜欢用比喻。",
+    background: "在城南图书馆工作六年，熟悉每一排书架，午休时会在窗边看闲书。",
+    tags: ["图书管理员"],
+    relationship: "常在图书馆遇到的姐姐",
+    example_openers: ["又来借书？"],
+  },
+});
+await page.locator('input[type="file"][accept*="json"]').setInputFiles({
+  name: "persona.json",
+  mimeType: "application/json",
+  buffer: Buffer.from(importJson),
+});
+await page.waitForTimeout(600);
+check(
+  "导入后先显示预览弹窗",
+  (await page.getByRole("heading", { name: "预览导入的人设" }).count()) > 0,
+);
+check(
+  "预览里有可编辑字段",
+  (await page.locator(".import-modal .field-grid input").count()) > 0,
+);
+const afterPreview = await page.evaluate(async () => {
+  const response = await fetch("/v1/companions", { credentials: "same-origin" });
+  return (await response.json()).length;
+});
+check("预览阶段未创建伴侣", afterPreview === beforeImport, `${beforeImport} → ${afterPreview}`);
+await page.getByRole("button", { name: "取消" }).click();
+await page.waitForTimeout(300);
+check("取消预览后弹窗关闭", (await page.locator(".import-modal").count()) === 0);
+
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "更多" }).first().click();
 check(
@@ -148,6 +193,25 @@ check("裁剪弹窗打开", (await cropper.count()) > 0);
 if ((await cropper.count()) > 0) {
   check("缩放滑杆存在", (await page.locator('.modal input[type="range"]').count()) > 0);
   check("保存/取消按钮存在", (await page.getByRole("button", { name: "保存头像" }).count()) > 0);
+
+  // 滚轮放大：标签应从 1.0× 变为更大
+  const beforeZoom = await page.locator(".modal .muted").last().innerText();
+  await cropper.hover();
+  await page.mouse.wheel(0, -600);
+  await page.waitForTimeout(300);
+  const afterZoom = await page.locator(".modal .muted").last().innerText();
+  check("滚轮可放大", beforeZoom !== afterZoom, `${beforeZoom} → ${afterZoom}`);
+
+  // 放大后拖动：不应报错，画布仍存在
+  const box = await cropper.boundingBox();
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 40);
+    await page.mouse.up();
+  }
+  check("放大后可拖动", (await cropper.count()) > 0);
+
   await page.screenshot({ path: "tmp/verify-cropper.png", fullPage: true });
   await page.getByRole("button", { name: "取消" }).click();
   await page.waitForTimeout(300);

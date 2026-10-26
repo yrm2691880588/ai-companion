@@ -8,6 +8,12 @@ interface Props {
 }
 
 const SIZE = 256;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 5;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 export default function AvatarCropper({ file, onCancel, onSave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -17,12 +23,34 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const [error, setError] = useState("");
 
+  function maxOffset(nextZoom: number): { x: number; y: number } {
+    const image = imageRef.current;
+    if (!image) return { x: 0, y: 0 };
+    const scale = Math.max(SIZE / image.width, SIZE / image.height) * nextZoom;
+    return {
+      x: Math.max(0, (image.width * scale - SIZE) / 2),
+      y: Math.max(0, (image.height * scale - SIZE) / 2),
+    };
+  }
+
+  function applyZoom(nextZoom: number) {
+    const bounded = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+    const limit = maxOffset(bounded);
+    setOffset((prev) => ({
+      x: clamp(prev.x, -limit.x, limit.x),
+      y: clamp(prev.y, -limit.y, limit.y),
+    }));
+    setZoom(bounded);
+  }
+
   useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
       imageRef.current = image;
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
       draw();
     };
     image.onerror = () => setError("图片读取失败，请换一张");
@@ -35,6 +63,31 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
     draw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, offset]);
+
+  // 鼠标滚轮缩放（必须非 passive 才能 preventDefault）
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (event: WheelEvent) => {
+      event.preventDefault();
+      setZoom((current) => {
+        const next = clamp(
+          current * (event.deltaY < 0 ? 1.1 : 0.9),
+          MIN_ZOOM,
+          MAX_ZOOM,
+        );
+        const limit = maxOffset(next);
+        setOffset((prev) => ({
+          x: clamp(prev.x, -limit.x, limit.x),
+          y: clamp(prev.y, -limit.y, limit.y),
+        }));
+        return next;
+      });
+    };
+    canvas.addEventListener("wheel", handler, { passive: false });
+    return () => canvas.removeEventListener("wheel", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
 
   function draw() {
     const canvas = canvasRef.current;
@@ -69,10 +122,10 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
 
   function onPointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!dragRef.current) return;
-    const limit = SIZE * 0.6;
+    const limit = maxOffset(zoom);
     setOffset({
-      x: Math.max(-limit, Math.min(limit, event.clientX - dragRef.current.x)),
-      y: Math.max(-limit, Math.min(limit, event.clientY - dragRef.current.y)),
+      x: clamp(event.clientX - dragRef.current.x, -limit.x, limit.x),
+      y: clamp(event.clientY - dragRef.current.y, -limit.y, limit.y),
     });
   }
 
@@ -92,7 +145,9 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <h2>调整头像</h2>
-        <p className="muted">拖动图片调整位置，滑动缩放；圆形区域就是最终头像。</p>
+        <p className="muted">
+          拖动图片调整位置；鼠标滚轮或下方滑杆缩放；圆形区域就是最终头像。
+        </p>
         {error && <div className="alert">{error}</div>}
         <canvas
           ref={canvasRef}
@@ -109,11 +164,11 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
         </label>
         <input
           type="range"
-          min={0.6}
-          max={3}
+          min={MIN_ZOOM}
+          max={MAX_ZOOM}
           step={0.05}
           value={zoom}
-          onChange={(event) => setZoom(Number(event.target.value))}
+          onChange={(event) => applyZoom(Number(event.target.value))}
         />
         <div className="toolbar">
           <button className="primary" onClick={save}>
