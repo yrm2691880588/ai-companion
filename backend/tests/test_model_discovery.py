@@ -34,7 +34,7 @@ class FakeClient:
         self._response = response
         self.requested_url = ""
 
-    async def __aenter__(self) -> "FakeClient":
+    async def __aenter__(self) -> FakeClient:
         return self
 
     async def __aexit__(self, *args: object) -> None:

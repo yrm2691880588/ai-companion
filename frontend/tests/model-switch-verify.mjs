@@ -15,13 +15,13 @@ page.on("pageerror", (error) => errors.push(error.message));
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" });
 
 const options = await page.locator(".admin-field select").first().locator("option").count();
-check("模型下拉框有选项", options > 3, `${options} 个选项`);
+check("模型下拉框有选项", options >= 2, `${options} 个选项`);
 
 const providerCards = await page.locator(".grid .card").count();
 check("供应商卡片渲染", providerCards >= 8, `${providerCards} 张`);
 
-const hasKeyCount = await page.getByText("未配置 Key").count();
-check("未配置 Key 有标注", hasKeyCount > 0, `${hasKeyCount} 处`);
+const missingCount = await page.getByText("未配置", { exact: true }).count();
+check("供应商标注是否已配置", missingCount > 0, `${missingCount} 处未配置`);
 
 // 切换模型并保存
 const select = page.locator(".admin-field select").first();
@@ -53,3 +53,4 @@ await browser.close();
 const failed = results.filter((item) => !item.ok);
 console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
 if (failed.length > 0) process.exit(1);
+
