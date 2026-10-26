@@ -348,6 +348,7 @@ class ChatService:
         context_budget_tokens: int = 8000,
         safety: SafetyEventRepository | None = None,
         quota: QuotaService | None = None,
+        profiles: object | None = None,
     ) -> None:
         self._repo = repo
         self._companions = companions
@@ -358,6 +359,7 @@ class ChatService:
         self._context_budget = max(context_budget_tokens, 500)
         self._safety = safety
         self._quota = quota
+        self._profiles = profiles
         self._background: set[asyncio.Task[object]] = set()
 
     async def ensure_quota(self, user_id: str) -> QuotaState | None:
@@ -426,7 +428,15 @@ class ChatService:
             return existing[0]
         companion = await self._companions.get(user_id, session.companion_id)
         now = datetime.now(SHANGHAI)
-        prompt = companion.compiled_prompt + OPENERS_NOTE.format(time_hint=time_hint(now))
+        profile_note = ""
+        if self._profiles is not None:
+            try:
+                profile_note = await self._profiles.prompt_for(user_id, companion.id)  # type: ignore[attr-defined]
+            except Exception:
+                profile_note = ""
+        prompt = (
+            companion.compiled_prompt + profile_note + OPENERS_NOTE.format(time_hint=time_hint(now))
+        )
         messages = self._build_messages(prompt, []) + [
             Message(role=Role.USER, content="（现在由你先开口。）")
         ]
@@ -473,7 +483,13 @@ class ChatService:
         crisis: bool = False,
         restricted: bool = False,
     ) -> tuple[str, list[MessageRecord], list[str]]:
-        prompt = companion.compiled_prompt + SAFETY_NOTE
+        profile_note = ""
+        if self._profiles is not None:
+            try:
+                profile_note = await self._profiles.prompt_for(user_id, companion.id)  # type: ignore[attr-defined]
+            except Exception:
+                profile_note = ""
+        prompt = companion.compiled_prompt + profile_note + SAFETY_NOTE
         if crisis:
             prompt += CRISIS_NOTE
         elif restricted:

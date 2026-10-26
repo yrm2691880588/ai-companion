@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
 import { track } from "../analytics";
+import UserProfileForm from "../components/UserProfileForm";
 import type { Companion, Persona } from "../types";
 
 export default function PersonaPage() {
@@ -78,6 +79,14 @@ export default function PersonaPage() {
         />
       </div>
 
+      <div style={{ marginTop: 12 }}>
+        <UserProfileForm
+          companionId={companionId}
+          title="和她聊时的我"
+          description="只对当前伴侣生效；留空的字段会沿用「我的身份」里的通用信息。"
+        />
+      </div>
+
       {editing && (
         <div className="toolbar">
           <button className="primary" disabled={busy} onClick={() => void derive()}>
@@ -98,4 +107,5 @@ export default function PersonaPage() {
     </div>
   );
 }
+
 

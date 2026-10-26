@@ -3,6 +3,7 @@ import type {
   AdminSettings,
   AdminSettingsResponse,
   Companion,
+  CompanionUserProfile,
   Latest,
   LoginResponse,
   Memory,
@@ -18,6 +19,7 @@ import type {
   Summary,
   Template,
   UsageSummary,
+  UserProfile,
 } from "./types";
 
 const USER_KEY = "ai-companion-user-id";
@@ -288,6 +290,27 @@ export const api = {
   async usage(days = 7): Promise<UsageSummary> {
     return request<UsageSummary>(`/v1/me/usage/models?days=${days}`);
   },
+  async getProfile(): Promise<UserProfile> {
+    return request<UserProfile>("/v1/me/profile");
+  },
+  async saveProfile(profile: UserProfile): Promise<UserProfile> {
+    return request<UserProfile>("/v1/me/profile", {
+      method: "PUT",
+      body: JSON.stringify(profile),
+    });
+  },
+  async getCompanionProfile(id: number): Promise<CompanionUserProfile> {
+    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`);
+  },
+  async saveCompanionProfile(
+    id: number,
+    profile: Partial<CompanionUserProfile>,
+  ): Promise<CompanionUserProfile> {
+    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`, {
+      method: "PUT",
+      body: JSON.stringify(profile),
+    });
+  },
   async quota(): Promise<Quota> {
     return request<Quota>("/v1/me/quota");
   },
@@ -301,6 +324,7 @@ export const api = {
     });
   },
 };
+
 
 
 

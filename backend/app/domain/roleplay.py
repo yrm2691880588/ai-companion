@@ -292,6 +292,7 @@ class RoleplayService:
         *,
         history_limit: int = 20,
         quota: QuotaService | None = None,
+        profiles: object | None = None,
     ) -> None:
         self._scenarios = scenarios
         self._runs = runs
@@ -301,6 +302,7 @@ class RoleplayService:
         self._llm = llm
         self._history_limit = history_limit
         self._quota = quota
+        self._profiles = profiles
 
     async def ensure_quota(self, user_id: str) -> None:
         if self._quota is not None:
@@ -361,8 +363,17 @@ class RoleplayService:
             await self._quota.consume(user_id)
 
         history = await self._chat.list_messages(user_id, run.session_id, limit=self._history_limit)
+        profile_note = ""
+        if self._profiles is not None:
+            try:
+                profile_note = await self._profiles.prompt_for(user_id, run.companion_id)  # type: ignore[attr-defined]
+            except Exception:
+                profile_note = ""
         messages = [
-            Message(role=Role.SYSTEM, content=roleplay_system_prompt(scenario, run.turns_played))
+            Message(
+                role=Role.SYSTEM,
+                content=profile_note + roleplay_system_prompt(scenario, run.turns_played),
+            )
         ]
         for item in history:
             role = Role.ASSISTANT if item.role == "assistant" else Role.USER

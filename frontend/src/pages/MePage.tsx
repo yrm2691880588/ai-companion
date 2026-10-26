@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import AppearanceCard from "../components/AppearanceCard";
+import UserProfileForm from "../components/UserProfileForm";
 import type { Account } from "../types";
 
 export default function MePage() {
@@ -52,6 +53,13 @@ export default function MePage() {
       </div>
 
       <div style={{ marginTop: 12 }}>
+        <UserProfileForm
+          title="我的身份"
+          description="她默认会知道这些信息：怎么称呼你、你做什么、多大、在哪。不同伴侣可以单独覆盖。"
+        />
+      </div>
+
+      <div style={{ marginTop: 12 }}>
         <AppearanceCard />
       </div>
 
@@ -78,3 +86,4 @@ export default function MePage() {
     </div>
   );
 }
+

@@ -212,3 +212,23 @@ export interface LoginResponse {
   expires_at: string;
 }
 
+
+export interface UserProfile {
+  nickname: string;
+  identity: string;
+  age?: number | null;
+  gender: string;
+  city: string;
+  background: string;
+}
+
+export interface CompanionUserProfile {
+  companion_id: number;
+  nickname?: string | null;
+  identity?: string | null;
+  age?: number | null;
+  gender?: string | null;
+  city?: string | null;
+  background?: string | null;
+  effective: UserProfile;
+}

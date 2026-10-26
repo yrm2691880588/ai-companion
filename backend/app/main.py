@@ -27,6 +27,7 @@ from app.api.v1.roleplay import router as roleplay_router
 from app.api.v1.templates import router as templates_router
 from app.api.v1.trial import router as trial_router
 from app.api.v1.usage import router as usage_router
+from app.api.v1.user_profile import router as user_profile_router
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.domain.auth import AuthRepository, AuthService
@@ -45,6 +46,7 @@ from app.domain.system_settings import (
 from app.domain.templates import TEMPLATES, TemplateRepository
 from app.domain.trial import TrialService
 from app.domain.usage import UsageRepository
+from app.domain.user_profile import InMemoryUserProfileRepository, UserProfileService
 from app.infra.analytics_repo import InMemoryAnalyticsRepository, SqlAnalyticsRepository
 from app.infra.auth_repo import SqlAuthRepository
 from app.infra.chat_repo import SqlChatRepository
@@ -62,6 +64,7 @@ from app.infra.summary_repo import SqlSummaryRepository, SummaryRepository
 from app.infra.system_settings_repo import SqlSystemSettingsRepository
 from app.infra.template_repo import SqlTemplateRepository
 from app.infra.usage_repo import SqlUsageRepository
+from app.infra.user_profile_repo import SqlUserProfileRepository
 
 _LOG = logging.getLogger(__name__)
 
@@ -140,7 +143,13 @@ def create_app(
     companion_service = CompanionService(companions_store, client, templates_store)
     memory_service = MemoryService(memories_store, client)
     streamer: ChatStreamer = chat_streamer or router
-    trial_service = TrialService(streamer)
+    profile_repo = (
+        InMemoryUserProfileRepository()
+        if resolved.env == "test"
+        else SqlUserProfileRepository(session_factory)
+    )
+    profile_service = UserProfileService(profile_repo)
+    trial_service = TrialService(streamer, profiles=profile_service)
     analytics_repo = analytics_repo or (  # type: ignore[assignment]
         InMemoryAnalyticsRepository()
         if resolved.env == "test"
@@ -156,6 +165,7 @@ def create_app(
         resolved.chat_context_budget_tokens,
         safety_store,
         quota_service,
+        profile_service,
     )
     roleplay_service = RoleplayService(
         scenarios_store,
@@ -165,6 +175,7 @@ def create_app(
         streamer,
         client,
         quota=quota_service,
+        profiles=profile_service,
     )
 
     @asynccontextmanager
@@ -207,6 +218,7 @@ def create_app(
     app.state.system_settings = system_settings
     app.state.trial_service = trial_service
     app.state.analytics_repo = analytics_repo
+    app.state.user_profile_service = profile_service
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
     app.include_router(models_router)
     app.include_router(usage_router)
@@ -216,6 +228,7 @@ def create_app(
     app.include_router(templates_router)
     app.include_router(trial_router)
     app.include_router(analytics_router)
+    app.include_router(user_profile_router)
     app.include_router(roleplay_router)
     app.include_router(quota_router)
     app.include_router(auth_router)
@@ -270,3 +283,4 @@ def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
 
 
 app = create_app()
+

@@ -36,11 +36,14 @@ class TrialSession:
 class TrialService:
     """内存态试聊；进程重启即清空，符合“不落库”。"""
 
-    def __init__(self, streamer: object, *, daily_limit: int = 20) -> None:
+    def __init__(
+        self, streamer: object, *, daily_limit: int = 20, profiles: object | None = None
+    ) -> None:
         self._streamer = streamer
         self._sessions: dict[str, TrialSession] = {}
         self._lock = asyncio.Lock()
         self._daily_limit = max(daily_limit, 1)
+        self._profiles = profiles
         self._daily: dict[tuple[str, str], int] = {}
 
     async def chat(
@@ -92,7 +95,15 @@ class TrialService:
                 )
             session.turns.append(TrialTurn(role="user", content=text))
             history = list(session.turns)
-            system_prompt = compile_prompt(persona) + SAFETY_NOTE
+            profile_note = ""
+            if self._profiles is not None:
+                try:
+                    profile_note = await self._profiles.prompt_for(  # type: ignore[attr-defined]
+                        user_id, 0
+                    )
+                except Exception:
+                    profile_note = ""
+            system_prompt = compile_prompt(persona) + profile_note + SAFETY_NOTE
             assessment = assess_input(text)
             if assessment.is_crisis:
                 from app.domain.safety import CRISIS_NOTE
