@@ -34,6 +34,10 @@ from app.core.errors import AppError
 from app.domain.auth import AuthRepository, AuthService
 from app.domain.chat import ChatRepository, ChatService, ChatStreamer
 from app.domain.companions import CompanionRepository, CompanionService, LLMClient
+from app.domain.custom_models import (
+    InMemoryCustomModelRepository,
+    SqlCustomModelRepository,
+)
 from app.domain.deletion import DeletionRepository, DeletionService
 from app.domain.memory import MemoryRepository, MemoryService
 from app.domain.provider_settings import (
@@ -144,6 +148,11 @@ def create_app(
         provider_settings_store,
         known_providers=set(registry.providers),
     )
+    custom_model_repo = (
+        InMemoryCustomModelRepository()
+        if resolved.env == "test"
+        else SqlCustomModelRepository(session_factory)
+    )
     system_settings = SystemSettingsService(settings_store)
     quota_enforced, quota_limit = system_settings.quota_config()
     quota_service = QuotaService(quotas_store, daily_limit=quota_limit, enforced=quota_enforced)
@@ -227,6 +236,7 @@ def create_app(
     app.state.settings = resolved
     app.state.registry = registry
     app.state.provider_settings_service = provider_settings_service
+    app.state.custom_model_repo = custom_model_repo
 
     async def apply_provider_settings() -> None:
         """把库里的供应商 Key/URL 合并进注册表，并让路由使用新注册表。"""
@@ -236,9 +246,33 @@ def create_app(
             if setting.api_key:
                 keys[key] = setting.api_key
         updated = registry.with_keys(keys)
-        extra = getattr(app.state, "extra_models", {})
-        if extra:
-            updated = updated.with_extra_models(list(extra.values()))
+        stored_models = await custom_model_repo.all()
+        if stored_models:
+            from app.infra.llm.pricing import parse_banded_price
+            from app.infra.llm.types import Capability, ModelSpec
+
+            zero = parse_banded_price(
+                {
+                    "hit": {"peak": 0.0, "offpeak": 0.0},
+                    "miss": {"peak": 0.0, "offpeak": 0.0},
+                    "out": {"peak": 0.0, "offpeak": 0.0},
+                }
+            )
+            specs = [
+                ModelSpec(
+                    key=f"{item.provider_key}:{item.model_name}",
+                    provider_key=item.provider_key,
+                    model_name=item.model_name,
+                    display_name=item.display_name,
+                    context_window=item.context_window,
+                    max_output=item.max_output,
+                    supports=frozenset({Capability.STREAM}),
+                    price=zero,
+                    notes="用户导入的模型",
+                )
+                for item in stored_models
+            ]
+            updated = updated.with_extra_models(specs)
         app.state.registry = updated
         router.registry = updated
         client.registry = updated  # type: ignore[attr-defined]
@@ -330,4 +364,3 @@ def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
 
 
 app = create_app()
-

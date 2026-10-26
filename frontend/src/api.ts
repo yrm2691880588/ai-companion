@@ -313,6 +313,12 @@ export const api = {
       body: JSON.stringify({ model_ids: modelIds }),
     });
   },
+  async probeProvider(providerKey: string): Promise<{ ok: boolean; model_count?: number }> {
+    return request<{ ok: boolean; model_count?: number }>(
+      `/v1/provider-settings/${providerKey}/probe`,
+      { method: "POST" },
+    );
+  },
   async getProfile(): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile");
   },
@@ -347,6 +353,7 @@ export const api = {
     });
   },
 };
+
 
 
 

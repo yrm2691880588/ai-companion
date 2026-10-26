@@ -64,3 +64,8 @@ class ModelDiscovery:
             result.append({"id": model_id, "owned_by": str(item.get("owned_by") or "")})
         result.sort(key=lambda item: str(item["id"]))
         return result
+
+    async def probe(self, provider: ProviderConfig) -> dict[str, object]:
+        """最小探测：拉一次 /v1/models，确认 Key 与地址可用。"""
+        models = await self.list_models(provider)
+        return {"ok": True, "model_count": len(models)}

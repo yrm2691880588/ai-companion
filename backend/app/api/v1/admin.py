@@ -103,4 +103,3 @@ async def audit_tail(
     service = get_settings_service(request)
     repo = service._repo  # noqa: SLF001 - 审计查询直接走仓储，避免再包一层
     return await repo.audit_tail(max(1, min(limit, 100)))
-

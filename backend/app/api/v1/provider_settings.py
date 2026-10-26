@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user_id, require_admin
 from app.core.errors import AppError
+from app.domain.custom_models import CustomModel, CustomModelRepository
 from app.domain.provider_settings import ProviderSettingsService
 from app.infra.llm.discovery import ModelDiscovery
 from app.infra.llm.pricing import parse_banded_price
@@ -165,6 +166,21 @@ async def import_models(
                 notes="从供应商 /v1/models 导入，上下文与价格未核实",
             )
         )
+    # 持久化，重启后仍可恢复
+    custom_repo: CustomModelRepository | None = getattr(runtime, "custom_model_repo", None)
+    if custom_repo is not None:
+        await custom_repo.add_many(
+            [
+                CustomModel(
+                    provider_key=provider_key,
+                    model_name=spec.model_name,
+                    display_name=spec.display_name,
+                    context_window=spec.context_window,
+                    max_output=spec.max_output,
+                )
+                for spec in specs
+            ]
+        )
     updated = registry.with_extra_models(specs)
     runtime.registry = updated
     # 记录导入的模型，供后续热更新时保留
@@ -177,3 +193,19 @@ async def import_models(
     if hasattr(runtime, "apply_provider_settings"):
         await runtime.apply_provider_settings()
     return [spec.key for spec in specs]
+
+
+@router.post("/{provider_key}/probe")
+async def probe_provider(
+    provider_key: str,
+    request: Request,
+    _admin: AdminDep,
+) -> dict[str, object]:
+    """测试连接：确认 Key 与地址是否可用。"""
+    registry = request.app.state.registry
+    try:
+        provider = registry.provider(provider_key)
+    except KeyError as exc:
+        raise AppError(code="PROVIDER_NOT_FOUND", message="供应商不存在", status_code=404) from exc
+    result = await ModelDiscovery().probe(provider)
+    return {"provider_key": provider_key, **result}

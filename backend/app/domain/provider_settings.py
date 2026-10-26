@@ -88,4 +88,3 @@ class ProviderSettingsService:
             if setting.api_key:
                 result[key] = setting.api_key
         return result
-

@@ -19,6 +19,7 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
   const [discovered, setDiscovered] = useState<DiscoveredModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
+  const [probeResult, setProbeResult] = useState("");
 
   async function reload() {
     try {
@@ -38,6 +39,7 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
     setEditing(provider.key);
     setDiscovered([]);
     setDiscoverError("");
+    setProbeResult("");
     setApiKey("");
     setBaseUrl(setting?.base_url ?? provider.base_url);
     setEnabled(setting?.enabled ?? true);
@@ -64,6 +66,17 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
       setError((event as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function probe() {
+    if (!editing) return;
+    setProbeResult("测试中…");
+    try {
+      const result = await api.probeProvider(editing);
+      setProbeResult(result.ok ? `连接成功，可用模型 ${result.model_count} 个` : "连接失败");
+    } catch (event) {
+      setProbeResult((event as Error).message);
     }
   }
 
@@ -175,7 +188,11 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
               <button className="ghost" disabled={discovering} onClick={() => void discover()}>
                 {discovering ? "搜索中…" : "搜索该供应商的可用模型"}
               </button>
+              <button className="ghost" onClick={() => void probe()}>
+                测试连接
+              </button>
             </div>
+            {probeResult && <div className="notice">{probeResult}</div>}
             {discoverError && <div className="alert">{discoverError}</div>}
             {discovered.length > 0 && (
               <div className="discovered">
@@ -226,5 +243,6 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
     </div>
   );
 }
+
 
 
