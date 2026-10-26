@@ -22,6 +22,7 @@ from app.api.v1.memories import router as memories_router
 from app.api.v1.models import router as models_router
 from app.api.v1.persona_transfer import router as persona_transfer_router
 from app.api.v1.personas import router as personas_router
+from app.api.v1.provider_settings import router as provider_settings_router
 from app.api.v1.quota import router as quota_router
 from app.api.v1.roleplay import router as roleplay_router
 from app.api.v1.templates import router as templates_router
@@ -35,6 +36,10 @@ from app.domain.chat import ChatRepository, ChatService, ChatStreamer
 from app.domain.companions import CompanionRepository, CompanionService, LLMClient
 from app.domain.deletion import DeletionRepository, DeletionService
 from app.domain.memory import MemoryRepository, MemoryService
+from app.domain.provider_settings import (
+    InMemoryProviderSettingsRepository,
+    ProviderSettingsService,
+)
 from app.domain.quota import QuotaRepository, QuotaService
 from app.domain.roleplay import SCENARIOS, RoleplayService, RunRepository, ScenarioRepository
 from app.domain.safety import SafetyEventRepository
@@ -58,6 +63,7 @@ from app.infra.llm.gateway import LLMGateway
 from app.infra.llm.registry import ModelRegistry
 from app.infra.llm.router import ModelRouter
 from app.infra.memory_repo import SqlMemoryRepository
+from app.infra.provider_settings_repo import SqlProviderSettingsRepository
 from app.infra.quota_repo import SqlQuotaRepository
 from app.infra.roleplay_repo import SqlRunRepository, SqlSafetyRepository, SqlScenarioRepository
 from app.infra.summary_repo import SqlSummaryRepository, SummaryRepository
@@ -65,6 +71,7 @@ from app.infra.system_settings_repo import SqlSystemSettingsRepository
 from app.infra.template_repo import SqlTemplateRepository
 from app.infra.usage_repo import SqlUsageRepository
 from app.infra.user_profile_repo import SqlUserProfileRepository
+from app.security.crypto import SecretBox
 
 _LOG = logging.getLogger(__name__)
 
@@ -75,6 +82,17 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
         content={"code": exc.code, "message": exc.message, "details": exc.details},
     )
 
+
+
+def _secret_box(settings: Settings) -> SecretBox | None:
+    """主密钥可用时返回加密盒；未配置则返回 None（Key 不落库）。"""
+    raw = settings.master_key
+    if not raw:
+        return None
+    try:
+        return SecretBox(raw)
+    except Exception:
+        return None
 
 def create_app(
     settings: Settings | None = None,
@@ -116,6 +134,15 @@ def create_app(
         InMemorySystemSettingsRepository()
         if resolved.env == "test"
         else SqlSystemSettingsRepository(session_factory)
+    )
+    provider_settings_store = (
+        InMemoryProviderSettingsRepository()
+        if resolved.env == "test"
+        else SqlProviderSettingsRepository(session_factory, _secret_box(resolved))
+    )
+    provider_settings_service = ProviderSettingsService(
+        provider_settings_store,
+        known_providers=set(registry.providers),
     )
     system_settings = SystemSettingsService(settings_store)
     quota_enforced, quota_limit = system_settings.quota_config()
@@ -192,12 +219,28 @@ def create_app(
             quota_service.configure(enforced=enforced, daily_limit=limit)
         except Exception:
             _LOG.warning("系统设置加载失败，使用默认值", exc_info=True)
+        await app.state.apply_provider_settings()
         yield
         await engine.dispose()
 
     app = FastAPI(title="AI 伴侣系统 API", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved
     app.state.registry = registry
+    app.state.provider_settings_service = provider_settings_service
+
+    async def apply_provider_settings() -> None:
+        """把库里的供应商 Key/URL 合并进注册表，并让路由使用新注册表。"""
+        stored = await provider_settings_store.all()
+        keys = dict(resolved.provider_keys())
+        for key, setting in stored.items():
+            if setting.api_key:
+                keys[key] = setting.api_key
+        updated = registry.with_keys(keys)
+        app.state.registry = updated
+        router.registry = updated
+        client.registry = updated  # type: ignore[attr-defined]
+
+    app.state.apply_provider_settings = apply_provider_settings
     app.state.db_engine = engine
     app.state.session_factory = session_factory
     app.state.usage_repo = usage_store
@@ -223,6 +266,7 @@ def create_app(
     app.include_router(models_router)
     app.include_router(usage_router)
     app.include_router(personas_router)
+    app.include_router(provider_settings_router)
     app.include_router(persona_transfer_router)
     app.include_router(companions_router)
     app.include_router(templates_router)
@@ -283,5 +327,9 @@ def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
 
 
 app = create_app()
+
+
+
+
 
 

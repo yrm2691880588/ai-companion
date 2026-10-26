@@ -10,6 +10,7 @@ import type {
   Message,
   Persona,
   Provider,
+  ProviderSetting,
   Quota,
   Run,
   RunStart,
@@ -290,6 +291,18 @@ export const api = {
   async usage(days = 7): Promise<UsageSummary> {
     return request<UsageSummary>(`/v1/me/usage/models?days=${days}`);
   },
+  async providerSettings(): Promise<ProviderSetting[]> {
+    return request<ProviderSetting[]>("/v1/provider-settings");
+  },
+  async saveProviderSetting(
+    key: string,
+    patch: { api_key?: string; base_url?: string | null; enabled?: boolean },
+  ): Promise<ProviderSetting> {
+    return request<ProviderSetting>(`/v1/provider-settings/${key}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
   async getProfile(): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile");
   },
@@ -324,6 +337,7 @@ export const api = {
     });
   },
 };
+
 
 
 

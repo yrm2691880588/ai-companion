@@ -2,12 +2,23 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import AdminSettingsCard from "../components/AdminSettingsCard";
+import ProviderSettingsList from "../components/ProviderSettingsList";
 import type { Provider, UsageSummary } from "../types";
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [error, setError] = useState("");
+
+  async function reload() {
+    try {
+      const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
+      setProviders(list);
+      setUsage(summary);
+    } catch (event) {
+      setError((event as Error).message);
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -37,26 +48,8 @@ export default function SettingsPage() {
 
       <AdminSettingsCard />
 
-      <h2 style={{ marginTop: 18 }}>可用供应商</h2>
-      <div className="grid">
-        {providers.map((provider) => (
-          <div className="card" key={provider.key}>
-            <h3>{provider.name}</h3>
-            <p className="muted">
-              {provider.models.length} 个模型 ·{" "}
-              {provider.has_key ? `Key ${provider.masked_key}` : "未配置 Key"}
-            </p>
-            <div>
-              {provider.models.slice(0, 3).map((model) => (
-                <span className="tag" key={model.key}>
-                  {model.model_name}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
+      <h2 style={{ marginTop: 18 }}>供应商</h2>
+      <ProviderSettingsList providers={providers} onChanged={() => void reload()} />
       <h2 style={{ marginTop: 18 }}>最近 7 天用量</h2>
       {usage ? (
         <div className="card">
@@ -78,3 +71,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

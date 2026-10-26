@@ -232,3 +232,11 @@ export interface CompanionUserProfile {
   background?: string | null;
   effective: UserProfile;
 }
+
+export interface ProviderSetting {
+  provider_key: string;
+  has_key: boolean;
+  masked_key: string;
+  base_url?: string | null;
+  enabled: boolean;
+}
