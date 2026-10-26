@@ -1,5 +1,7 @@
 """用户身份接口：读写、伴侣覆盖、越权。"""
 
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
@@ -8,7 +10,6 @@ from app.domain.templates import TEMPLATES, InMemoryTemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import Usage
 from app.main import create_app
-from decimal import Decimal
 
 PERSONA = {
     "name": "林夏",

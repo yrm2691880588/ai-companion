@@ -1,8 +1,8 @@
 """本地模式：没有账号、没有管理员，所有人都是同一个本机用户。"""
 
-from fastapi.testclient import TestClient
-
 from decimal import Decimal
+
+from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.domain.companions import InMemoryCompanionRepository, LLMResult
