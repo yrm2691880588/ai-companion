@@ -330,6 +330,7 @@ class ChatDone:
     assistant_message_id: int
     model_key: str
     usage: Usage
+    memories: list[str] = field(default_factory=list)
 
 
 ChatEvent = ChatMeta | ChatDelta | ChatDone
@@ -471,17 +472,19 @@ class ChatService:
         *,
         crisis: bool = False,
         restricted: bool = False,
-    ) -> tuple[str, list[MessageRecord]]:
+    ) -> tuple[str, list[MessageRecord], list[str]]:
         prompt = companion.compiled_prompt + SAFETY_NOTE
         if crisis:
             prompt += CRISIS_NOTE
         elif restricted:
             prompt += RESTRICTED_NOTE
+        recalled: list[str] = []
         if self._memory is not None and companion.memory_enabled:
             try:
                 memories = await self._memory.recall(user_id, companion.id, query, limit=6)
             except Exception:
                 memories = []
+            recalled = [item.content for item in memories[:2]]
             prompt += format_for_prompt(memories)
 
         plan = plan_history(
@@ -493,7 +496,7 @@ class ChatService:
             summary = await self._ensure_summary(user_id, session.id, plan.older, request_id)
             if summary:
                 prompt += "\n\n# 此前对话摘要\n" + summary
-        return prompt, plan.kept
+        return prompt, plan.kept, recalled
 
     async def _ensure_summary(
         self,
@@ -563,7 +566,7 @@ class ChatService:
                 pass  # 留痕失败不影响对话
 
         history = await self._repo.list_messages(user_id, session_id, limit=MAX_HISTORY_MESSAGES)
-        system_prompt, kept_messages = await self._build_context(
+        system_prompt, kept_messages, recalled = await self._build_context(
             user_id,
             companion,
             session,
@@ -610,6 +613,7 @@ class ChatService:
             assistant_message_id=assistant.id,
             model_key=model_key,
             usage=aggregate_usage(usage_parts),
+            memories=recalled,
         )
 
     def _schedule_memory(
@@ -661,7 +665,7 @@ class ChatService:
         last_user = next((item for item in reversed(history) if item.role == "user"), None)
         query = last_user.content if last_user is not None else ""
         assessment = assess_input(query)
-        system_prompt, kept_messages = await self._build_context(
+        system_prompt, kept_messages, recalled = await self._build_context(
             user_id,
             companion,
             session,
@@ -702,4 +706,5 @@ class ChatService:
             assistant_message_id=target.id,
             model_key=model_key,
             usage=aggregate_usage(usage_parts),
+            memories=recalled,
         )

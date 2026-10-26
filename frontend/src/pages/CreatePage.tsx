@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
 import TrialChat from "../components/TrialChat";
+import PersonaImportButton from "../components/PersonaImport";
+import { track } from "../analytics";
 import type { Persona, Template } from "../types";
 
 export default function CreatePage() {
@@ -24,6 +26,7 @@ export default function CreatePage() {
   }, []);
 
   async function generate() {
+    track("create_start");
     if (description.trim().length < 4) {
       setError("请再多说几个字，方便生成人设");
       return;
@@ -55,6 +58,7 @@ export default function CreatePage() {
       const created = selected
         ? await api.createFromTemplate(selected, persona.name)
         : await api.createCompanion(persona);
+      track("create_success");
       navigate(`/companions/${created.id}/chat`);
     } catch (event) {
       setError((event as Error).message);
@@ -69,6 +73,7 @@ export default function CreatePage() {
       <p className="muted">一句话描述，或从模板开始；生成后可以逐项修改。</p>
 
       <div className="toolbar">
+        <PersonaImportButton />
         <button
           className={mode === "draft" ? "primary" : "ghost"}
           onClick={() => setMode("draft")}
@@ -159,4 +164,6 @@ export default function CreatePage() {
     </div>
   );
 }
+
+
 

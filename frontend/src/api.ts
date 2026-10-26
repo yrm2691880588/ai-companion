@@ -68,6 +68,7 @@ export interface StreamHandlers {
     model?: string;
     input_tokens?: number;
     output_tokens?: number;
+    memories?: string[];
   }) => void;
   onError?: (error: ApiError) => void;
 }
@@ -173,6 +174,12 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-User-Id": getUserId() },
       body: JSON.stringify({ persona, content, trial_id: trialId }),
+    });
+  },
+  async importPersona(persona: Persona, name?: string): Promise<Companion> {
+    return request<Companion>("/v1/personas/import", {
+      method: "POST",
+      body: JSON.stringify({ format: "ai-companion-persona", version: 1, persona, name }),
     });
   },
   async deriveCompanion(id: number, persona: Persona, name?: string): Promise<Companion> {
@@ -294,5 +301,7 @@ export const api = {
     });
   },
 };
+
+
 
 

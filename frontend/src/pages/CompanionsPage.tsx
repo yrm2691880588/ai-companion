@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
+import { downloadPersona } from "../components/PersonaImport";
 import type { Companion, Latest } from "../types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -228,6 +229,7 @@ export default function CompanionsPage() {
                   {menuId === item.id && (
                     <div className="menu">
                       <Link to={`/companions/${item.id}/persona`}>人设</Link>
+                      <button className="link" onClick={() => downloadPersona(item)}>导出人设</button>
                       <Link to={`/companions/${item.id}/memories`}>记忆</Link>
                       <Link to={`/companions/${item.id}/roleplay`}>演练</Link>
                       {item.avatar && (
@@ -295,5 +297,6 @@ export default function CompanionsPage() {
     </div>
   );
 }
+
 
 

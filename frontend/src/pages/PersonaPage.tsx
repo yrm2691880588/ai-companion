@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
+import { track } from "../analytics";
 import type { Companion, Persona } from "../types";
 
 export default function PersonaPage() {
@@ -30,6 +31,7 @@ export default function PersonaPage() {
     setError("");
     try {
       const created = await api.deriveCompanion(companionId, draft);
+      track("persona_save");
       navigate(`/companions/${created.id}/chat`);
     } catch (event) {
       setError((event as Error).message);
@@ -96,3 +98,4 @@ export default function PersonaPage() {
     </div>
   );
 }
+

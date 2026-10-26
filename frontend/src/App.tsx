@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api";
+import { track } from "./analytics";
 import type { Account } from "./types";
 import ChatPage from "./pages/ChatPage";
 import CompanionsPage from "./pages/CompanionsPage";
@@ -19,6 +20,7 @@ export default function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    track("app_open");
     api
       .me()
       .then((me) => {
@@ -82,4 +84,5 @@ export default function App() {
     </div>
   );
 }
+
 

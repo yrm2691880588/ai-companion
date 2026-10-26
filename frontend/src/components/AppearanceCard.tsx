@@ -3,6 +3,7 @@ import { PRESETS, loadTheme, saveTheme, type ThemeState } from "../theme";
 
 export default function AppearanceCard() {
   const [theme, setTheme] = useState<ThemeState>(() => loadTheme());
+  const [echo, setEcho] = useState(() => localStorage.getItem("ai-companion-echo") !== "off");
 
   return (
     <div className="card">
@@ -23,6 +24,19 @@ export default function AppearanceCard() {
           </button>
         ))}
       </div>
+      <label className="muted" style={{ display: "block", marginTop: 12 }}>
+        <input
+          type="checkbox"
+          checked={echo}
+          onChange={(event) => {
+            const next = event.target.checked;
+            setEcho(next);
+            localStorage.setItem("ai-companion-echo", next ? "on" : "off");
+          }}
+        />{" "}
+        在回复下方显示“她想起了…”
+      </label>
+
       <div className="composer" style={{ marginTop: 10 }}>
         <label className="muted" style={{ alignSelf: "center" }}>
           自定义主色
@@ -51,3 +65,4 @@ export default function AppearanceCard() {
     </div>
   );
 }
+

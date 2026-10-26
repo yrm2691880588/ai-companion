@@ -219,6 +219,7 @@ async def send_message(
                             "input_tokens": event.usage.input_tokens,
                             "output_tokens": event.usage.completion_tokens,
                             "cache_hit_tokens": event.usage.cache_hit_tokens,
+                            "memories": event.memories,
                         },
                     )
         except AppError as exc:

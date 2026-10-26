@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
+import { track } from "../analytics";
 import type { Companion, Message, Quota, Session } from "../types";
 
 const STICK_THRESHOLD = 80;
@@ -55,6 +56,12 @@ export default function ChatPage() {
     { kind: "session" | "message"; id: number; title: string } | null
   >(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [recap, setRecap] = useState<string | null>(null);
+  const [echo, setEcho] = useState<{ messageId: number; items: string[] } | null>(null);
+  const [echoOpen, setEchoOpen] = useState(false);
+  const trackedReplyRef = useRef(false);
+  const echoEnabled = localStorage.getItem("ai-companion-echo") !== "off";
+  const [recapOpen, setRecapOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -95,6 +102,14 @@ export default function ChatPage() {
     setError("");
     setShowJump(false);
     stickRef.current = true;
+    setRecap(null);
+    setRecapOpen(false);
+    setEcho(null);
+    setEchoOpen(false);
+    api
+      .summary(id)
+      .then((data) => setRecap(data.summary ?? null))
+      .catch(() => setRecap(null));
     const list = await api.messages(id);
     setMessages(list);
     if (list.length === 0) {
@@ -136,6 +151,7 @@ export default function ChatPage() {
       { id: tempAssistantId, session_id: sessionId, seq: 0, role: "assistant", content: "", created_at: now },
     ]);
     setStreaming(true);
+    if (messages.length === 0) track("first_message");
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -143,17 +159,28 @@ export default function ChatPage() {
         `/v1/sessions/${sessionId}/messages`,
         { content: text, client_request_id: crypto.randomUUID?.() ?? `${Date.now()}` },
         {
-          onDelta: (delta) =>
+          onDelta: (delta) => {
+            if (!trackedReplyRef.current) {
+              trackedReplyRef.current = true;
+              track("first_reply");
+            }
             setMessages((prev) =>
               prev.map((item) =>
                 item.id === tempAssistantId ? { ...item, content: item.content + delta } : item,
               ),
-            ),
+            );
+          },
           onError: (err) => setError(err.message),
-          onDone: () => {
+          onDone: (data) => {
+            if (data.memories && data.memories.length > 0) {
+              setEcho({ messageId: 0, items: data.memories });
+            }
             void (async () => {
               const list = await api.messages(sessionId);
               setMessages(list);
+              if (data.memories && data.memories.length > 0 && list.length > 0) {
+                setEcho({ messageId: list[list.length - 1].id, items: data.memories });
+              }
               setSessions(await api.sessions(companionId));
               setQuota(await api.quota());
             })();
@@ -164,6 +191,7 @@ export default function ChatPage() {
     } catch (event) {
       if (!(event instanceof DOMException && event.name === "AbortError")) {
         setError((event as Error).message);
+        track("error", { error_code: "STREAM_FAILED" });
       } else if (sessionId) {
         window.setTimeout(() => {
           void api.messages(sessionId).then(setMessages);
@@ -181,6 +209,7 @@ export default function ChatPage() {
 
   async function regenerate(messageId: number) {
     if (!sessionId || streaming) return;
+    track("message_action");
     setError("");
     setStreaming(true);
     setMessages((prev) =>
@@ -212,6 +241,7 @@ export default function ChatPage() {
     } catch (event) {
       if (!(event instanceof DOMException && event.name === "AbortError")) {
         setError((event as Error).message);
+        track("error", { error_code: "STREAM_FAILED" });
       }
     } finally {
       setStreaming(false);
@@ -220,6 +250,7 @@ export default function ChatPage() {
   }
 
   async function copy(content: string) {
+    track("message_action");
     try {
       await navigator.clipboard.writeText(content);
       setNotice("已复制");
@@ -424,6 +455,15 @@ export default function ChatPage() {
         </aside>
 
         <section className="chat-panel">
+          {recap && (
+            <div className="recap">
+              <button className="recap-head" onClick={() => setRecapOpen(!recapOpen)}>
+                <span>上次聊到</span>
+                <span className="muted">{recapOpen ? "收起" : "展开"}</span>
+              </button>
+              <p className={recapOpen ? "recap-body" : "recap-body clamp"}>{recap}</p>
+            </div>
+          )}
           <div className="messages" ref={scrollerRef} onScroll={onScroll}>
             {messages.map((item, index) => {
               const prev = messages[index - 1];
@@ -462,6 +502,20 @@ export default function ChatPage() {
                         </button>
                       )}
                     </div>
+                    {echoEnabled && echo && echo.messageId === item.id && (
+                      <div className="echo">
+                        <button className="echo-head" onClick={() => setEchoOpen(!echoOpen)}>
+                          她想起了… <span className="muted">{echoOpen ? "收起" : "展开"}</span>
+                        </button>
+                        {echoOpen && (
+                          <ul className="echo-list">
+                            {echo.items.map((text, index) => (
+                              <li key={index}>{text}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </Fragment>
               );
@@ -537,3 +591,9 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
+
+
+
+

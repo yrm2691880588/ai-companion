@@ -79,10 +79,58 @@ if (firstCompanionId) {
     "按钮文案不是“保存”",
     !(await page.getByRole("button", { name: /^保存人设$/ }).count()),
   );
+
+  // 真实点击衍生：改名字后创建，验证跳转与新伴侣
+  const nameInput = page.locator("#p-name");
+  const newName = `测试衍生${Date.now() % 100000}`;
+  await nameInput.fill(newName);
+  await deriveButton.click();
+  await page.waitForURL(/\/companions\/\d+\/chat/, { timeout: 15000 });
+  check("衍生后跳转到聊天页", true, page.url());
+  const derivedId = Number(page.url().match(/\/companions\/(\d+)\/chat/)?.[1] ?? 0);
+  check("衍生伴侣 id 有效", derivedId > 0, String(derivedId));
+  const derived = await page.evaluate(async (id) => {
+    const response = await fetch(`/v1/companions/${id}`, { credentials: "same-origin" });
+    return response.ok ? await response.json() : null;
+  }, derivedId);
+  check("衍生伴侣名字正确", derived?.name === newName, String(derived?.name));
+  check("衍生来源正确", derived?.derived_from === firstCompanionId, String(derived?.derived_from));
+  // 清理测试伴侣
+  await page.evaluate(
+    async ({ id, name }) => {
+      await fetch(`/v1/companions/${id}?confirm_name=${encodeURIComponent(name)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+    },
+    { id: derivedId, name: newName },
+  );
   await page.screenshot({ path: "tmp/verify-persona.png", fullPage: true });
 }
 
-// 4) 头像裁剪弹窗（点击头像会触发系统文件选择，用 filechooser 接管）
+// 4) P0.5：导入入口、承接、记忆提示、埋点
+await page.goto(`${BASE}/create`, { waitUntil: "networkidle" });
+check(
+  "创建页有导入人设入口",
+  (await page.getByRole("button", { name: "导入人设" }).count()) > 0,
+);
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "更多" }).first().click();
+check(
+  "伴侣菜单有导出人设",
+  (await page.getByRole("button", { name: "导出人设" }).count()) > 0,
+);
+
+// 埋点：打开页面应产生 app_open
+const analyticsCount = await page.evaluate(async () => {
+  const response = await fetch("/v1/analytics/summary?days=1", { credentials: "same-origin" });
+  if (!response.ok) return -1;
+  const rows = await response.json();
+  return rows.filter((row) => row.name === "app_open").reduce((sum, row) => sum + row.count, 0);
+});
+check("埋点已记录 app_open", analyticsCount > 0, `计数 ${analyticsCount}`);
+
+// 5) 头像裁剪弹窗（点击头像会触发系统文件选择，用 filechooser 接管）
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 const avatar = page.locator(".avatar-editable").first();
 check("头像可点击", (await avatar.count()) > 0);

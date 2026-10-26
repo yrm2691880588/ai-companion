@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.admin import router as admin_router
+from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import me_router as me_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
@@ -19,6 +20,7 @@ from app.api.v1.companions import router as companions_router
 from app.api.v1.export import router as export_router
 from app.api.v1.memories import router as memories_router
 from app.api.v1.models import router as models_router
+from app.api.v1.persona_transfer import router as persona_transfer_router
 from app.api.v1.personas import router as personas_router
 from app.api.v1.quota import router as quota_router
 from app.api.v1.roleplay import router as roleplay_router
@@ -43,6 +45,7 @@ from app.domain.system_settings import (
 from app.domain.templates import TEMPLATES, TemplateRepository
 from app.domain.trial import TrialService
 from app.domain.usage import UsageRepository
+from app.infra.analytics_repo import InMemoryAnalyticsRepository, SqlAnalyticsRepository
 from app.infra.auth_repo import SqlAuthRepository
 from app.infra.chat_repo import SqlChatRepository
 from app.infra.companion_repo import SqlCompanionRepository
@@ -85,6 +88,7 @@ def create_app(
     safety_repo: SafetyEventRepository | None = None,
     quota_repo: QuotaRepository | None = None,
     auth_repo: AuthRepository | None = None,
+    analytics_repo: object | None = None,
     deletion_repo: DeletionRepository | None = None,
     system_settings_repo: SystemSettingsRepository | None = None,
 ) -> FastAPI:
@@ -137,6 +141,11 @@ def create_app(
     memory_service = MemoryService(memories_store, client)
     streamer: ChatStreamer = chat_streamer or router
     trial_service = TrialService(streamer)
+    analytics_repo = analytics_repo or (  # type: ignore[assignment]
+        InMemoryAnalyticsRepository()
+        if resolved.env == "test"
+        else SqlAnalyticsRepository(session_factory)
+    )
     chat_service = ChatService(
         chats_store,
         companion_service,
@@ -197,13 +206,16 @@ def create_app(
     app.state.deletion_service = deletion_service
     app.state.system_settings = system_settings
     app.state.trial_service = trial_service
+    app.state.analytics_repo = analytics_repo
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
     app.include_router(models_router)
     app.include_router(usage_router)
     app.include_router(personas_router)
+    app.include_router(persona_transfer_router)
     app.include_router(companions_router)
     app.include_router(templates_router)
     app.include_router(trial_router)
+    app.include_router(analytics_router)
     app.include_router(roleplay_router)
     app.include_router(quota_router)
     app.include_router(auth_router)
