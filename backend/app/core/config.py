@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     session_days: int = 7
     # 管理员手机号（逗号分隔），登录时自动授予 admin
     admin_phones: str = ""
+    # 本地单用户模式（开源默认）：没有账号、没有管理员
+    local_mode: bool = True
+    local_user_id: str = "local-user"
     # 前端构建产物目录；留空则用仓库下的 frontend/dist
     frontend_dist: str = ""
 
@@ -86,3 +89,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+

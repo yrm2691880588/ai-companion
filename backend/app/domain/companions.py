@@ -23,7 +23,7 @@ from app.domain.templates import TemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import Message, Role, TaskName, Usage
 
-MAX_COMPANIONS = 10
+MAX_COMPANIONS = 50
 MIN_DESCRIPTION = 4
 MAX_DESCRIPTION = 200
 MAX_AVATAR_BYTES = 300 * 1024
@@ -467,3 +467,4 @@ class CompanionService:
                 status_code=502,
             ) from exc
         return data["value"], result
+

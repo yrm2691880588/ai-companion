@@ -4,24 +4,6 @@ import { writeFileSync } from "node:fs";
 const BASE = "http://127.0.0.1:8000";
 const PHONE = "TEST_PHONE_REDACTED";
 
-async function loginCookie() {
-  const codeResp = await fetch(`${BASE}/v1/auth/sms-code`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone: PHONE }),
-  });
-  const { debug_code } = await codeResp.json();
-  const loginResp = await fetch(`${BASE}/v1/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone: PHONE, code: debug_code }),
-  });
-  const cookie = loginResp.headers.get("set-cookie") || "";
-  const match = cookie.match(/ac_session=([^;]+)/);
-  if (!match) throw new Error("登录失败，未拿到 cookie");
-  return match[1];
-}
-
 const results = [];
 let derivedToCleanup = null;
 function check(name, ok, detail = "") {
@@ -35,10 +17,8 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
-const cookie = await loginCookie();
-await context.addCookies([
-  { name: "ac_session", value: cookie, domain: "127.0.0.1", path: "/", httpOnly: true },
-]);
+
+
 const page = await context.newPage();
 const errors = [];
 const badResponses = [];
@@ -86,6 +66,7 @@ if (firstCompanionId) {
   const newName = `测试衍生${Date.now() % 100000}`;
   await nameInput.fill(newName);
   await deriveButton.click();
+  await page.waitForTimeout(3000);
   await page.waitForURL(/\/companions\/\d+\/chat/, { timeout: 15000 });
   check("衍生后跳转到聊天页", true, page.url());
   const derivedId = Number(page.url().match(/\/companions\/(\d+)\/chat/)?.[1] ?? 0);
@@ -242,4 +223,6 @@ const failed = results.filter((item) => !item.ok);
 writeFileSync("tmp/page-verify-report.json", JSON.stringify(results, null, 2));
 console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
 if (failed.length > 0) process.exit(1);
+
+
 

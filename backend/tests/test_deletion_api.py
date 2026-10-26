@@ -34,7 +34,7 @@ class FakeLLM:
 def client(deletion: InMemoryDeletionRepository) -> TestClient:
     return TestClient(
         create_app(
-            Settings(env="test", _env_file=None),  # type: ignore[call-arg]
+            Settings(local_mode=False, env="test", _env_file=None),  # type: ignore[call-arg]
             companion_repo=InMemoryCompanionRepository(),
             template_repo=InMemoryTemplateRepository(TEMPLATES),
             llm_client=FakeLLM(),

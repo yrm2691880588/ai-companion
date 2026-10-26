@@ -49,53 +49,9 @@ export default function AdminSettingsCard() {
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
-      <h2>管理员设置</h2>
-      <p className="muted">统一控制额度开关与默认模型参数；普通用户看不到这一块。</p>
+      <h2>模型参数</h2>
+      <p className="muted">本机统一配置，保存后下一条回复生效。</p>
       {error && <div className="alert">{error}</div>}
-      <label className="muted">
-        <input
-          type="checkbox"
-          checked={admin.settings.quota.enforced}
-          onChange={(event) =>
-            setAdmin({
-              ...admin,
-              settings: {
-                ...admin.settings,
-                quota: { ...admin.settings.quota, enforced: event.target.checked },
-              },
-            })
-          }
-        />{" "}
-        启用每日额度（关闭时仍记录轮次）
-      </label>
-      <div className="composer" style={{ marginTop: 8 }}>
-        <label className="muted" style={{ alignSelf: "center" }}>
-          每日上限
-        </label>
-        <input
-          type="number"
-          min={1}
-          max={10000}
-          value={admin.settings.quota.daily_limit}
-          onChange={(event) =>
-            setAdmin({
-              ...admin,
-              settings: {
-                ...admin.settings,
-                quota: {
-                  ...admin.settings.quota,
-                  daily_limit: Number(event.target.value),
-                },
-              },
-            })
-          }
-        />
-      </div>
-
-      <p className="muted">
-        温度越高越发散，top_p 越低越保守；思考模式会增加延迟和成本。保存后下一条回复生效。
-      </p>
-
       {(["chat_main", "persona_generate"] as const).map((task) => {
         const item = admin.settings.model_defaults[task];
         const label = task === "chat_main" ? "日常对话" : "人设生成";
@@ -175,3 +131,4 @@ export default function AdminSettingsCard() {
     </div>
   );
 }
+

@@ -3,54 +3,31 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import AppearanceCard from "../components/AppearanceCard";
 import UserProfileForm from "../components/UserProfileForm";
-import type { Account } from "../types";
+import type { Provider, UsageSummary } from "../types";
 
 export default function MePage() {
-  const [account, setAccount] = useState<Account | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .me()
-      .then(setAccount)
-      .catch(() => setAccount(null));
+    void (async () => {
+      try {
+        const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
+        setProviders(list);
+        setUsage(summary);
+      } catch (event) {
+        setError((event as Error).message);
+      }
+    })();
   }, []);
-
-  async function logout() {
-    try {
-      await api.logout();
-      window.location.href = "/login";
-    } catch (event) {
-      setError((event as Error).message);
-    }
-  }
 
   return (
     <div>
       <h1>我的</h1>
-      <p className="muted">账号、外观、隐私与反馈都在这里；模型与用量只对管理员开放。</p>
+      <p className="muted">身份、外观、模型与数据都在这台机器上，不需要登录。</p>
 
       {error && <div className="alert">{error}</div>}
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <h2>账号</h2>
-        {account?.phone_masked ? (
-          <p>
-            {account.phone_masked}
-            <button className="ghost" style={{ marginLeft: 10 }} onClick={() => void logout()}>
-              退出登录
-            </button>
-          </p>
-        ) : (
-          <p className="muted">
-            当前是开发模式（未登录）。
-            <Link to="/login" style={{ marginLeft: 6 }}>
-              去登录
-            </Link>
-          </p>
-        )}
-        {account?.role === "admin" && <p className="muted">管理员账号</p>}
-      </div>
 
       <div style={{ marginTop: 12 }}>
         <UserProfileForm
@@ -64,26 +41,47 @@ export default function MePage() {
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h2>隐私与数据</h2>
-        <p className="muted">你的对话与记忆只属于这个账号；删除伴侣会一并清理关联数据。</p>
+        <h2>模型</h2>
+        <p className="muted">
+          默认使用 DeepSeek V4.1 Flash；可以在这里调整温度、top_p、思考模式等参数。
+        </p>
         <div className="toolbar">
+          <Link className="btn" to="/settings">
+            模型与用量
+          </Link>
           <a className="btn ghost" href="/v1/me/export" target="_blank" rel="noreferrer">
             导出我的数据（JSON）
           </a>
-          {account?.role === "admin" && (
-            <Link className="btn ghost" to="/settings">
-              模型与用量（管理员）
-            </Link>
-          )}
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
+        <h2>可用供应商</h2>
+        <p className="muted">共 {providers.length} 家；未配置 Key 的供应商不会出现在对话路由里。</p>
+        <div>
+          {providers.slice(0, 6).map((provider) => (
+            <span className="tag" key={provider.key}>
+              {provider.name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {usage && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h2>最近 7 天用量</h2>
+          <p className="muted">
+            调用 {usage.totals.calls} 次 · 成本 ¥{usage.totals.cost_cny.toFixed(4)} · 缓存命中{" "}
+            {Math.round(usage.totals.hit_ratio * 100)}%
+          </p>
+        </div>
+      )}
+
+      <div className="card" style={{ marginTop: 12 }}>
         <h2>关于</h2>
-        <p className="muted">AI 伴侣系统 v0.1.0 · 内测中，欢迎把问题告诉我。</p>
+        <p className="muted">AI 伴侣系统 v0.1.0 · 本地开源版，数据只存在本机。</p>
         <p className="muted">遇到危机时，请拨打全国心理援助热线 12356，紧急情况拨打 120。</p>
       </div>
     </div>
   );
 }
-

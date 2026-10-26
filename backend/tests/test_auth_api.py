@@ -9,6 +9,7 @@ def client(
     auth_repo: InMemoryAuthRepository | None = None, **settings_kwargs: object
 ) -> TestClient:
     values: dict[str, object] = {
+        "local_mode": False,
         "env": "test",
         "_env_file": None,
         "debug_auth": False,

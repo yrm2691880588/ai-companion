@@ -15,8 +15,10 @@ from app.infra.summary_repo import SummaryRepository
 
 
 async def get_current_user_id(request: Request) -> str:
-    """优先 Cookie 会话；开发模式允许 X-User-Id 兜底。"""
+    """本地模式固定本机用户；否则优先 Cookie 会话，开发模式允许 X-User-Id 兜底。"""
     settings = request.app.state.settings
+    if getattr(settings, "local_mode", False):
+        return getattr(settings, "local_user_id", "local-user")
     service = getattr(request.app.state, "auth_service", None)
     token = request.cookies.get(COOKIE_NAME, "")
     if token and isinstance(service, AuthService):
@@ -82,6 +84,9 @@ def get_deletion_service(request: Request) -> DeletionService:
 
 
 async def require_admin(request: Request, user_id: str = Depends(get_current_user_id)) -> str:
+    settings = request.app.state.settings
+    if getattr(settings, "local_mode", False):
+        return user_id
     service = getattr(request.app.state, "auth_service", None)
     if isinstance(service, AuthService) and user_id.isdigit():
         if await service.is_admin(int(user_id)):
@@ -90,3 +95,4 @@ async def require_admin(request: Request, user_id: str = Depends(get_current_use
         status_code=403,
         detail={"code": "FORBIDDEN", "message": "需要管理员权限"},
     )
+

@@ -41,6 +41,7 @@ class MeOut(BaseModel):
     account_id: int | None = None
     phone_masked: str | None = None
     role: str = "user"
+    local_mode: bool = False
     created_at: datetime | None = None
 
 
@@ -102,6 +103,8 @@ async def me(
     request: Request,
     user_id: Annotated[str, Depends(get_current_user_id)],
 ) -> MeOut:
+    if getattr(request.app.state.settings, "local_mode", False):
+        return MeOut(user_id=user_id, role="local", local_mode=True)
     service = getattr(request.app.state, "auth_service", None)
     if isinstance(service, AuthService) and user_id.isdigit():
         account = await service.me(int(user_id))
@@ -114,3 +117,4 @@ async def me(
                 created_at=account.created_at,
             )
     return MeOut(user_id=user_id)
+

@@ -133,7 +133,9 @@ def test_unknown_companion_returns_404_with_code() -> None:
 
 def test_rejects_too_many_companions() -> None:
     test_client = client(FakeLLM([]))
-    for _ in range(10):
+    from app.domain.companions import MAX_COMPANIONS
+
+    for _ in range(MAX_COMPANIONS):
         assert test_client.post("/v1/companions", json={"persona": PERSONA_DICT}).status_code == 201
     response = test_client.post("/v1/companions", json={"persona": PERSONA_DICT})
     assert response.status_code == 409

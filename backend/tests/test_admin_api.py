@@ -14,6 +14,7 @@ def build_client(
     admin_phones: str = "",
 ) -> TestClient:
     settings = Settings(  # type: ignore[call-arg]
+        local_mode=False,
         env="test",
         _env_file=None,
         debug_auth=False,

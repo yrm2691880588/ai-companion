@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import type { Account, Provider, UsageSummary } from "../types";
 import AdminSettingsCard from "../components/AdminSettingsCard";
+import type { Provider, UsageSummary } from "../types";
 
 export default function SettingsPage() {
-  const [account, setAccount] = useState<Account | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [error, setError] = useState("");
@@ -13,9 +12,6 @@ export default function SettingsPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const me = await api.me();
-        setAccount(me);
-        if (me.role !== "admin") return;
         const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
         setProviders(list);
         setUsage(summary);
@@ -25,28 +21,21 @@ export default function SettingsPage() {
     })();
   }, []);
 
-  if (account && account.role !== "admin") {
-    return (
-      <div>
-        <h1>模型与用量</h1>
-        <div className="card">
-          <p>这里只有管理员可以查看。模型参数由管理员统一配置，普通用户不需要理解这些概念。</p>
-          <Link className="btn" to="/me">
-            回到我的
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <h1>模型与用量</h1>
-      <p className="muted">管理员专用：统一模型参数、供应商状态与最近用量。</p>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div>
+          <h1>模型与用量</h1>
+          <p className="muted">本地版没有管理员，这些参数由你自己调整。</p>
+        </div>
+        <Link className="btn ghost" to="/me">
+          回到我的
+        </Link>
+      </div>
 
       {error && <div className="alert">{error}</div>}
 
-      {account?.role === "admin" && <AdminSettingsCard />}
+      <AdminSettingsCard />
 
       <h2 style={{ marginTop: 18 }}>可用供应商</h2>
       <div className="grid">
