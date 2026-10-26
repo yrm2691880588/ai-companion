@@ -97,4 +97,3 @@ async def test_derive_requires_ownership() -> None:
 
     with pytest.raises(NotFound):
         await service.derive("u2", source.id, source.persona)
-

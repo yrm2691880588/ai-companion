@@ -171,6 +171,7 @@ class SqlChatRepository:
                         ChatMessage.session_id == session_id,
                         ChatMessage.client_request_id == client_request_id,
                         ChatSession.user_id == user_id,
+                        ChatMessage.deleted_at.is_(None),
                     )
                 )
             ).scalar_one_or_none()
@@ -186,6 +187,7 @@ class SqlChatRepository:
                         ChatMessage.id == message_id,
                         ChatSession.user_id == user_id,
                         ChatSession.deleted_at.is_(None),
+                        ChatMessage.deleted_at.is_(None),
                     )
                 )
             ).scalar_one_or_none()
@@ -203,6 +205,7 @@ class SqlChatRepository:
                         ChatMessage.id == message_id,
                         ChatSession.user_id == user_id,
                         ChatSession.deleted_at.is_(None),
+                        ChatMessage.deleted_at.is_(None),
                     )
                 )
             ).scalar_one_or_none()

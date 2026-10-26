@@ -36,10 +36,12 @@ class TrialSession:
 class TrialService:
     """内存态试聊；进程重启即清空，符合“不落库”。"""
 
-    def __init__(self, streamer: object) -> None:
+    def __init__(self, streamer: object, *, daily_limit: int = 20) -> None:
         self._streamer = streamer
         self._sessions: dict[str, TrialSession] = {}
         self._lock = asyncio.Lock()
+        self._daily_limit = max(daily_limit, 1)
+        self._daily: dict[tuple[str, str], int] = {}
 
     async def chat(
         self,
@@ -56,8 +58,23 @@ class TrialService:
         if len(text) > 2000:
             raise InvalidInput("单条消息最多 2000 字")
         async with self._lock:
+            if trial_id and trial_id not in self._sessions:
+                raise AppError(
+                    code="TRIAL_NOT_FOUND",
+                    message="试聊已过期，请重新开始",
+                    status_code=404,
+                )
+            today = time.strftime("%Y-%m-%d")
+            key = (user_id, today)
+            if not trial_id and self._daily.get(key, 0) >= self._daily_limit:
+                raise AppError(
+                    code="TRIAL_DAILY_LIMIT",
+                    message=f"今天试聊次数已用完（{self._daily_limit} 次），明天再来",
+                    status_code=429,
+                )
             session = self._sessions.get(trial_id) if trial_id else None
             if session is None:
+                self._daily[key] = self._daily.get(key, 0) + 1
                 session = TrialSession(id=new_ulid(), persona=persona, created_at=time.time())
                 self._sessions[session.id] = session
                 self._trim()

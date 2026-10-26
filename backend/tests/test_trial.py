@@ -135,4 +135,3 @@ async def test_trial_service_rejects_persona_change() -> None:
             )
         ]
     assert excinfo.value.code == "TRIAL_PERSONA_CHANGED"
-
