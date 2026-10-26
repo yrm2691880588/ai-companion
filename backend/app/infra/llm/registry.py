@@ -94,6 +94,15 @@ class ModelRegistry:
             default_provider=self.default_provider,
         )
 
+    def with_extra_models(self, specs: Sequence[ModelSpec]) -> ModelRegistry:
+        """把用户从供应商 /v1/models 发现的模型加入注册表（已存在则跳过）。"""
+        models = dict(self._models)
+        for spec in specs:
+            models.setdefault(spec.key, spec)
+        return ModelRegistry(
+            self._providers, models, self._routes, default_provider=self.default_provider
+        )
+
     def resolve(
         self,
         task: TaskName | str,

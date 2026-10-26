@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 from app.api.deps import get_current_user_id, require_admin
 from app.core.errors import AppError
 from app.domain.provider_settings import ProviderSettingsService
+from app.infra.llm.discovery import ModelDiscovery
+from app.infra.llm.pricing import parse_banded_price
+from app.infra.llm.registry import ModelRegistry
+from app.infra.llm.types import Capability, ModelSpec
 from app.security.crypto import mask_secret
 
 router = APIRouter(prefix="/v1/provider-settings", tags=["provider-settings"])
@@ -91,4 +95,86 @@ async def update_setting(
         base_url=setting.base_url,
         enabled=setting.enabled,
     )
+
+
+class DiscoveredModelOut(BaseModel):
+    id: str
+    owned_by: str = ""
+
+
+@router.get("/{provider_key}/models", response_model=list[DiscoveredModelOut])
+async def discover_models(
+    provider_key: str,
+    request: Request,
+    _admin: AdminDep,
+) -> list[DiscoveredModelOut]:
+    """向供应商的 /v1/models 拉取真实可用模型。"""
+    registry = request.app.state.registry
+    try:
+        provider = registry.provider(provider_key)
+    except KeyError as exc:
+        raise AppError(code="PROVIDER_NOT_FOUND", message="供应商不存在", status_code=404) from exc
+    models = await ModelDiscovery().list_models(provider)
+    return [DiscoveredModelOut(**item) for item in models]
+
+
+class ImportModelsIn(BaseModel):
+    model_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+@router.post("/{provider_key}/models/import", response_model=list[str])
+async def import_models(
+    provider_key: str,
+    payload: ImportModelsIn,
+    request: Request,
+    _admin: AdminDep,
+) -> list[str]:
+    """把搜索到的模型加入本机注册表，随后可在模型下拉里选择。"""
+    runtime = request.app.state
+    registry: ModelRegistry = runtime.registry
+    try:
+        provider = registry.provider(provider_key)
+    except KeyError as exc:
+        raise AppError(code="PROVIDER_NOT_FOUND", message="供应商不存在", status_code=404) from exc
+
+    zero = parse_banded_price(
+        {
+            "hit": {"peak": 0.0, "offpeak": 0.0},
+            "miss": {"peak": 0.0, "offpeak": 0.0},
+            "out": {"peak": 0.0, "offpeak": 0.0},
+        }
+    )
+    specs: list[ModelSpec] = []
+    for model_id in payload.model_ids:
+        cleaned = model_id.strip()
+        if not cleaned:
+            continue
+        key = f"{provider.key}:{cleaned}"
+        if key in registry.models:
+            continue
+        specs.append(
+            ModelSpec(
+                key=key,
+                provider_key=provider.key,
+                model_name=cleaned,
+                display_name=cleaned,
+                context_window=32768,
+                max_output=8192,
+                supports=frozenset({Capability.STREAM}),
+                price=zero,
+                notes="从供应商 /v1/models 导入，上下文与价格未核实",
+            )
+        )
+    updated = registry.with_extra_models(specs)
+    runtime.registry = updated
+    # 记录导入的模型，供后续热更新时保留
+    extra = getattr(runtime, "extra_models", None)
+    if extra is None:
+        extra = {}
+        runtime.extra_models = extra
+    for spec in specs:
+        extra[spec.key] = spec
+    if hasattr(runtime, "apply_provider_settings"):
+        await runtime.apply_provider_settings()
+    return [spec.key for spec in specs]
 

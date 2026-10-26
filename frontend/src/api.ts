@@ -4,6 +4,7 @@ import type {
   AdminSettingsResponse,
   Companion,
   CompanionUserProfile,
+  DiscoveredModel,
   Latest,
   LoginResponse,
   Memory,
@@ -303,6 +304,15 @@ export const api = {
       body: JSON.stringify(patch),
     });
   },
+  async discoverModels(providerKey: string): Promise<DiscoveredModel[]> {
+    return request<DiscoveredModel[]>(`/v1/provider-settings/${providerKey}/models`);
+  },
+  async importModels(providerKey: string, modelIds: string[]): Promise<string[]> {
+    return request<string[]>(`/v1/provider-settings/${providerKey}/models/import`, {
+      method: "POST",
+      body: JSON.stringify({ model_ids: modelIds }),
+    });
+  },
   async getProfile(): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile");
   },
@@ -337,6 +347,8 @@ export const api = {
     });
   },
 };
+
+
 
 
 

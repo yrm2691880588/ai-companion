@@ -240,3 +240,8 @@ export interface ProviderSetting {
   base_url?: string | null;
   enabled: boolean;
 }
+
+export interface DiscoveredModel {
+  id: string;
+  owned_by: string;
+}

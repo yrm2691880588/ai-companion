@@ -117,4 +117,3 @@ async def me(
                 created_at=account.created_at,
             )
     return MeOut(user_id=user_id)
-

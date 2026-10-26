@@ -467,4 +467,3 @@ class CompanionService:
                 status_code=502,
             ) from exc
         return data["value"], result
-

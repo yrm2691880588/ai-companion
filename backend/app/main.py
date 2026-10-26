@@ -83,7 +83,6 @@ async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
-
 def _secret_box(settings: Settings) -> SecretBox | None:
     """主密钥可用时返回加密盒；未配置则返回 None（Key 不落库）。"""
     raw = settings.master_key
@@ -93,6 +92,7 @@ def _secret_box(settings: Settings) -> SecretBox | None:
         return SecretBox(raw)
     except Exception:
         return None
+
 
 def create_app(
     settings: Settings | None = None,
@@ -236,6 +236,9 @@ def create_app(
             if setting.api_key:
                 keys[key] = setting.api_key
         updated = registry.with_keys(keys)
+        extra = getattr(app.state, "extra_models", {})
+        if extra:
+            updated = updated.with_extra_models(list(extra.values()))
         app.state.registry = updated
         router.registry = updated
         client.registry = updated  # type: ignore[attr-defined]
@@ -327,9 +330,4 @@ def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
 
 
 app = create_app()
-
-
-
-
-
 

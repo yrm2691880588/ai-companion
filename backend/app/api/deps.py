@@ -95,4 +95,3 @@ async def require_admin(request: Request, user_id: str = Depends(get_current_use
         status_code=403,
         detail={"code": "FORBIDDEN", "message": "需要管理员权限"},
     )
-
