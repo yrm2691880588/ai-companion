@@ -949,3 +949,15 @@ label {
 .import-form .field-grid {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
+
+/* ---------- 聊天页头部更多菜单 ---------- */
+.header-menu {
+  top: calc(100% + 6px);
+  bottom: auto;
+  right: 0;
+  min-width: 140px;
+}
+
+.header-menu a {
+  padding: 8px 12px;
+}

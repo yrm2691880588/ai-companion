@@ -57,6 +57,7 @@ export default function ChatPage() {
   >(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [recap, setRecap] = useState<string | null>(null);
+  const [headerMenu, setHeaderMenu] = useState(false);
   const [echo, setEcho] = useState<{ messageId: number; items: string[] } | null>(null);
   const [echoOpen, setEchoOpen] = useState(false);
   const trackedReplyRef = useRef(false);
@@ -76,8 +77,12 @@ export default function ChatPage() {
         ]);
         setCompanion(loaded);
         setSessions(list);
-        if (list.length > 0) await selectSession(list[0].id);
-
+        if (list.length > 0) {
+          await selectSession(list[0].id);
+        } else {
+          // 没有任何会话时自动建一个，让她先开口，避免空白页
+          await newSession();
+        }
       } catch (event) {
         setError((event as Error).message);
       }
@@ -359,16 +364,27 @@ export default function ChatPage() {
             </p>
           </div>
         </div>
-        <div className="toolbar">
+        <div className="toolbar" style={{ position: "relative" }}>
           <Link className="btn ghost" to={`/companions/${companionId}/persona`}>
             人设
           </Link>
-          <Link className="btn ghost" to={`/companions/${companionId}/memories`}>
-            记忆
-          </Link>
-          <Link className="btn ghost" to={`/companions/${companionId}/roleplay`}>
-            演练
-          </Link>
+          <button
+            className="btn ghost"
+            aria-label="更多操作"
+            onClick={() => setHeaderMenu(!headerMenu)}
+          >
+            ⋯
+          </button>
+          {headerMenu && (
+            <div className="menu header-menu">
+              <Link to={`/companions/${companionId}/memories`} onClick={() => setHeaderMenu(false)}>
+                她记得的事
+              </Link>
+              <Link to={`/companions/${companionId}/roleplay`} onClick={() => setHeaderMenu(false)}>
+                场景演练
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -584,6 +600,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
 
 
 

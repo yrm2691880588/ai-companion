@@ -23,6 +23,7 @@ async function loginCookie() {
 }
 
 const results = [];
+let derivedToCleanup = null;
 function check(name, ok, detail = "") {
   results.push({ name, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? " - " + detail : ""}`);
@@ -95,16 +96,9 @@ if (firstCompanionId) {
   }, derivedId);
   check("衍生伴侣名字正确", derived?.name === newName, String(derived?.name));
   check("衍生来源正确", derived?.derived_from === firstCompanionId, String(derived?.derived_from));
-  // 清理测试伴侣
-  await page.evaluate(
-    async ({ id, name }) => {
-      await fetch(`/v1/companions/${id}?confirm_name=${encodeURIComponent(name)}`, {
-        method: "DELETE",
-        credentials: "same-origin",
-      });
-    },
-    { id: derivedId, name: newName },
-  );
+  // 不在此处删除：聊天页刚自动建了会话并可能正在请求开场白，
+  // 删除会产生在途 404。放到全部检查结束后统一清理。
+  derivedToCleanup = { id: derivedId, name: newName };
   await page.screenshot({ path: "tmp/verify-persona.png", fullPage: true });
 }
 
@@ -218,6 +212,19 @@ if ((await cropper.count()) > 0) {
   check("取消后弹窗关闭", (await page.locator(".avatar-canvas").count()) === 0);
 }
 
+if (derivedToCleanup) {
+  await page.waitForTimeout(1500);
+  await page.evaluate(
+    async ({ id, name }) => {
+      await fetch(`/v1/companions/${id}?confirm_name=${encodeURIComponent(name)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+    },
+    derivedToCleanup,
+  );
+}
+
 check(
   "页面无 JS 异常",
   errors.length === 0,
@@ -235,3 +242,4 @@ const failed = results.filter((item) => !item.ok);
 writeFileSync("tmp/page-verify-report.json", JSON.stringify(results, null, 2));
 console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
 if (failed.length > 0) process.exit(1);
+
