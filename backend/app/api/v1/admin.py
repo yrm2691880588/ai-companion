@@ -36,17 +36,37 @@ class SettingsOut(BaseModel):
 
 
 def _models(request: Request) -> list[dict[str, Any]]:
+    """只返回当前真正可用的模型：供应商已配置 Key（或本地供应商已启用）。"""
     registry = request.app.state.registry
-    return [
-        {
-            "key": spec.key,
-            "display_name": spec.display_name,
-            "provider": spec.provider_key,
-            "context_window": spec.context_window,
-            "max_output": spec.max_output,
-        }
-        for spec in registry.models.values()
-    ]
+    settings_service = getattr(request.app.state, "provider_settings_service", None)
+    stored: dict[str, Any] = {}
+    if settings_service is not None:
+        stored = getattr(settings_service, "_cached", {}) or {}
+    result: list[dict[str, Any]] = []
+    for spec in registry.models.values():
+        provider = registry.provider(spec.provider_key)
+        setting = stored.get(spec.provider_key)
+        if setting is not None and not setting.enabled:
+            continue
+        # 云端看 Key；本地供应商必须由用户显式配置并启用
+        if provider.api_key:
+            available = True
+        elif provider.allow_private:
+            available = setting is not None
+        else:
+            available = False
+        if not available:
+            continue
+        result.append(
+            {
+                "key": spec.key,
+                "display_name": spec.display_name,
+                "provider": spec.provider_key,
+                "context_window": spec.context_window,
+                "max_output": spec.max_output,
+            }
+        )
+    return result
 
 
 @router.get("/settings", response_model=SettingsOut)
@@ -83,3 +103,4 @@ async def audit_tail(
     service = get_settings_service(request)
     repo = service._repo  # noqa: SLF001 - 审计查询直接走仓储，避免再包一层
     return await repo.audit_tail(max(1, min(limit, 100)))
+

@@ -46,9 +46,11 @@ class ProviderSettingsService:
         self._repo = repo
         self._box = box
         self._known = known_providers or set()
+        self._cached: dict[str, ProviderSetting] = {}
 
     async def load(self) -> dict[str, ProviderSetting]:
-        return await self._repo.all()
+        self._cached = await self._repo.all()
+        return dict(self._cached)
 
     async def update(
         self,
@@ -75,7 +77,9 @@ class ProviderSettingsService:
             existing.base_url = cleaned_url or None
         if enabled is not None:
             existing.enabled = enabled
-        return await self._repo.upsert(existing)
+        saved = await self._repo.upsert(existing)
+        self._cached[provider_key] = saved
+        return saved
 
     def keys_for_registry(self, settings: dict[str, ProviderSetting]) -> dict[str, str]:
         """把库里的 Key 解密成注册表可直接使用的映射。"""
@@ -84,3 +88,4 @@ class ProviderSettingsService:
             if setting.api_key:
                 result[key] = setting.api_key
         return result
+

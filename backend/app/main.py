@@ -230,7 +230,7 @@ def create_app(
 
     async def apply_provider_settings() -> None:
         """把库里的供应商 Key/URL 合并进注册表，并让路由使用新注册表。"""
-        stored = await provider_settings_store.all()
+        stored = await provider_settings_service.load()
         keys = dict(resolved.provider_keys())
         for key, setting in stored.items():
             if setting.api_key:
