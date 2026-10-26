@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
+import TrialChat from "../components/TrialChat";
 import type { Persona, Template } from "../types";
 
 export default function CreatePage() {
@@ -12,6 +13,7 @@ export default function CreatePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [trialOpen, setTrialOpen] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -138,6 +140,9 @@ export default function CreatePage() {
             <button className="primary" disabled={busy} onClick={() => void create()}>
               {busy ? "创建中…" : "创建并开始聊天"}
             </button>
+            <button className="ghost" disabled={busy} onClick={() => setTrialOpen(true)}>
+              先试聊 3 句
+            </button>
             <button className="ghost" disabled={busy} onClick={() => setPersona(null)}>
               重新选择
             </button>
@@ -147,6 +152,11 @@ export default function CreatePage() {
           )}
         </div>
       )}
+
+      {trialOpen && persona && (
+        <TrialChat persona={persona} onClose={() => setTrialOpen(false)} />
+      )}
     </div>
   );
 }
+

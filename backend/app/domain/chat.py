@@ -317,6 +317,7 @@ class ChatStreamer(Protocol):
 class ChatMeta:
     session_id: int
     user_message_id: int
+    trial_id: str | None = None
 
 
 @dataclass(slots=True)

@@ -66,12 +66,18 @@ class CompanionOut(BaseModel):
     persona: Persona
     memory_enabled: bool = True
     avatar: str | None = None
+    derived_from: int | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class PersonaPutIn(BaseModel):
     persona: Persona
+
+
+class DeriveIn(BaseModel):
+    persona: Persona
+    name: str | None = Field(default=None, max_length=20)
 
 
 class AvatarIn(BaseModel):

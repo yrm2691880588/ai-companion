@@ -40,6 +40,7 @@ class CompanionRecord:
     compiled_prompt: str
     memory_enabled: bool = True
     avatar: str | None = None
+    derived_from: int | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -66,7 +67,12 @@ class CompanionRepository(Protocol):
     async def count(self, user_id: str) -> int: ...
 
     async def create(
-        self, user_id: str, name: str, persona: Persona, compiled_prompt: str
+        self,
+        user_id: str,
+        name: str,
+        persona: Persona,
+        compiled_prompt: str,
+        derived_from: int | None = None,
     ) -> CompanionRecord: ...
 
     async def list(self, user_id: str) -> list[CompanionRecord]: ...
@@ -97,7 +103,12 @@ class InMemoryCompanionRepository:
         return sum(1 for item in self._items.values() if item.user_id == user_id)
 
     async def create(
-        self, user_id: str, name: str, persona: Persona, compiled_prompt: str
+        self,
+        user_id: str,
+        name: str,
+        persona: Persona,
+        compiled_prompt: str,
+        derived_from: int | None = None,
     ) -> CompanionRecord:
         record = CompanionRecord(
             id=self._next_id,
@@ -106,6 +117,7 @@ class InMemoryCompanionRepository:
             current_version=1,
             persona=persona,
             compiled_prompt=compiled_prompt,
+            derived_from=derived_from,
         )
         self._items[record.id] = record
         self._next_id += 1
@@ -275,7 +287,12 @@ class CompanionService:
 
     # ---------- 增删改查 ----------
     async def create(
-        self, user_id: str, persona: Persona, *, name: str | None = None
+        self,
+        user_id: str,
+        persona: Persona,
+        *,
+        name: str | None = None,
+        derived_from: int | None = None,
     ) -> CompanionRecord:
         if await self._repo.count(user_id) >= MAX_COMPANIONS:
             raise AppError(
@@ -290,7 +307,11 @@ class CompanionService:
             raise InvalidInput("伴侣名字最多 20 个字")
         record_persona = persona.model_copy(update={"name": final_name})
         return await self._repo.create(
-            user_id, final_name, record_persona, compile_prompt(record_persona)
+            user_id,
+            final_name,
+            record_persona,
+            compile_prompt(record_persona),
+            derived_from=derived_from,
         )
 
     async def list(self, user_id: str) -> list[CompanionRecord]:
@@ -308,6 +329,24 @@ class CompanionService:
         if name:
             persona = persona.model_copy(update={"name": name.strip()})
         return await self.create(user_id, persona)
+
+    async def derive(
+        self,
+        user_id: str,
+        companion_id: int,
+        persona: Persona,
+        *,
+        name: str | None = None,
+    ) -> CompanionRecord:
+        """基于已有伴侣的人设创建新伴侣；不复制会话、记忆、头像与演练。"""
+        source = await self.get(user_id, companion_id)
+        final_name = (name or persona.name).strip() or source.name
+        record = await self.create(
+            user_id,
+            persona.model_copy(update={"name": final_name}),
+            derived_from=source.id,
+        )
+        return record
 
     async def delete(self, user_id: str, companion_id: int, confirm_name: str) -> None:
         record = await self.get(user_id, companion_id)

@@ -32,3 +32,5 @@ class Memory(Base):
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ulid: Mapped[str] = mapped_column(String(26), unique=True)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64), default="local")

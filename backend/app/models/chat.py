@@ -31,6 +31,8 @@ class ChatSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ulid: Mapped[str] = mapped_column(String(26), unique=True)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64), default="local")
 
 
 class ChatMessage(Base):
@@ -48,6 +50,9 @@ class ChatMessage(Base):
     content: Mapped[str] = mapped_column(Text)
     client_request_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ulid: Mapped[str] = mapped_column(String(26), unique=True)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64), default="local")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SessionSummary(Base):

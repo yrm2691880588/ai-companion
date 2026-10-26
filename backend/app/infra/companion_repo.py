@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.ids import new_ulid
 from app.domain.companions import CompanionRecord
 from app.domain.persona import Persona
 from app.models.companions import Companion, CompanionPersona
@@ -26,11 +27,22 @@ class SqlCompanionRepository:
             return int(result.scalar_one())
 
     async def create(
-        self, user_id: str, name: str, persona: Persona, compiled_prompt: str
+        self,
+        user_id: str,
+        name: str,
+        persona: Persona,
+        compiled_prompt: str,
+        derived_from: int | None = None,
     ) -> CompanionRecord:
         async with self._session_factory() as session:
             companion = Companion(
-                user_id=user_id, name=name, current_version=1, memory_enabled=True
+                user_id=user_id,
+                name=name,
+                current_version=1,
+                memory_enabled=True,
+                ulid=new_ulid(),
+                origin_device_id="local",
+                derived_from=derived_from,
             )
             session.add(companion)
             await session.flush()
@@ -40,6 +52,8 @@ class SqlCompanionRepository:
                     version=1,
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
+                    ulid=new_ulid(),
+                    origin_device_id="local",
                 )
             )
             await session.commit()
@@ -52,6 +66,7 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=True,
                 avatar=companion.avatar,
+                derived_from=companion.derived_from,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at or datetime.now(UTC),
             )
@@ -115,6 +130,8 @@ class SqlCompanionRepository:
                     version=version,
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
+                    ulid=new_ulid(),
+                    origin_device_id="local",
                 )
             )
             companion.current_version = version
@@ -130,6 +147,7 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=companion.memory_enabled,
                 avatar=companion.avatar,
+                derived_from=companion.derived_from,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at,
             )
@@ -201,6 +219,7 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         compiled_prompt=persona_row.compiled_prompt,
         memory_enabled=companion.memory_enabled,
         avatar=companion.avatar,
+        derived_from=companion.derived_from,
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )

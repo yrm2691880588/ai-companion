@@ -21,6 +21,7 @@ export interface Companion {
   persona: Persona;
   memory_enabled: boolean;
   avatar?: string | null;
+  derived_from?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -210,3 +211,4 @@ export interface LoginResponse {
   phone_masked: string;
   expires_at: string;
 }
+

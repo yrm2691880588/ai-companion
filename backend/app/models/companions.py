@@ -30,11 +30,14 @@ class Companion(Base):
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     memory_enabled: Mapped[bool] = mapped_column(default=True)
     avatar: Mapped[str | None] = mapped_column(Text)
+    ulid: Mapped[str] = mapped_column(String(26), unique=True)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64), default="local")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    derived_from: Mapped[int | None] = mapped_column(BigInteger)
 
     personas: Mapped[list[CompanionPersona]] = relationship(
         back_populates="companion", cascade="all, delete-orphan"
@@ -53,6 +56,8 @@ class CompanionPersona(Base):
     persona: Mapped[dict[str, object]] = mapped_column(JSONType)
     compiled_prompt: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ulid: Mapped[str] = mapped_column(String(26), unique=True)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64), default="local")
 
     companion: Mapped[Companion] = relationship(back_populates="personas")
 

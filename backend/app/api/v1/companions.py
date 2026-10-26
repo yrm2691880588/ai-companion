@@ -11,6 +11,7 @@ from app.api.v1.companion_schemas import (
     AvatarIn,
     CompanionCreateIn,
     CompanionOut,
+    DeriveIn,
     DimensionPatchIn,
     DimensionRegenerateIn,
     DimensionRegenerateOut,
@@ -32,6 +33,7 @@ def _out(record: CompanionRecord) -> CompanionOut:
         persona=record.persona,
         memory_enabled=record.memory_enabled,
         avatar=record.avatar,
+        derived_from=record.derived_from,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -132,6 +134,20 @@ async def set_avatar(
 ) -> CompanionOut:
     """上传/清除头像：data URL（PNG/JPEG/WebP，≤300KB）。"""
     record = await service.set_avatar(user_id, companion_id, payload.avatar)
+    return _out(record)
+
+
+@router.post(
+    "/{companion_id}/derive", response_model=CompanionOut, status_code=status.HTTP_201_CREATED
+)
+async def derive_companion(
+    companion_id: int,
+    payload: DeriveIn,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> CompanionOut:
+    """基于已有伴侣的人设创建新伴侣：只复制人设，不复制会话/记忆/头像。"""
+    record = await service.derive(user_id, companion_id, payload.persona, name=payload.name)
     return _out(record)
 
 

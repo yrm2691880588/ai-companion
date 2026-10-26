@@ -8,6 +8,7 @@ import CreatePage from "./pages/CreatePage";
 import LoginPage from "./pages/LoginPage";
 import MePage from "./pages/MePage";
 import MemoryPage from "./pages/MemoryPage";
+import PersonaPage from "./pages/PersonaPage";
 import RoleplayPage from "./pages/RoleplayPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/" element={<CompanionsPage />} />
           <Route path="/create" element={<CreatePage />} />
           <Route path="/companions/:id/chat" element={<ChatPage />} />
+          <Route path="/companions/:id/persona" element={<PersonaPage />} />
           <Route path="/companions/:id/memories" element={<MemoryPage />} />
           <Route path="/companions/:id/roleplay" element={<RoleplayPage />} />
           <Route path="/me" element={<MePage />} />
@@ -80,3 +82,4 @@ export default function App() {
     </div>
   );
 }
+

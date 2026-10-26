@@ -61,7 +61,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export interface StreamHandlers {
-  onMeta?: (data: { session_id: number; user_message_id: number }) => void;
+  onMeta?: (data: { session_id?: number; user_message_id?: number; trial_id?: string }) => void;
   onDelta?: (text: string) => void;
   onDone?: (data: {
     assistant_message_id: number;
@@ -164,6 +164,19 @@ export const api = {
   },
   async createCompanion(persona: Persona, name?: string): Promise<Companion> {
     return request<Companion>("/v1/companions", {
+      method: "POST",
+      body: JSON.stringify({ persona, name }),
+    });
+  },
+  async trialChat(persona: Persona, content: string, trialId?: string): Promise<Response> {
+    return fetch("/v1/trial/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User-Id": getUserId() },
+      body: JSON.stringify({ persona, content, trial_id: trialId }),
+    });
+  },
+  async deriveCompanion(id: number, persona: Persona, name?: string): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}/derive`, {
       method: "POST",
       body: JSON.stringify({ persona, name }),
     });
@@ -281,3 +294,5 @@ export const api = {
     });
   },
 };
+
+

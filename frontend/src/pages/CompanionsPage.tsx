@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import AvatarCropper from "../components/AvatarCropper";
 import type { Companion, Latest } from "../types";
 
-function resizeAvatar(file: File): Promise<string> {
+function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
       reject(new Error("请选择图片文件"));
@@ -13,22 +14,8 @@ function resizeAvatar(file: File): Promise<string> {
     const url = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
-      const size = 256;
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext("2d");
-      if (!context) {
-        URL.revokeObjectURL(url);
-        reject(new Error("图片处理失败"));
-        return;
-      }
-      const scale = Math.max(size / image.width, size / image.height);
-      const width = image.width * scale;
-      const height = image.height * scale;
-      context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(image);
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -63,6 +50,7 @@ export default function CompanionsPage() {
   const [deleting, setDeleting] = useState(false);
   const [avatarTarget, setAvatarTarget] = useState<number | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function reload() {
@@ -103,13 +91,26 @@ export default function CompanionsPage() {
     setAvatarBusy(true);
     setError("");
     try {
-      const avatar = await resizeAvatar(file);
-      const updated = await api.setAvatar(avatarTarget, avatar);
+      // 先打开裁剪器，确认后再上传；这里只校验图片可读
+      await loadImage(file);
+      setCropFile(file);
+    } catch (err) {
+      setError((err as Error).message);
+      setAvatarTarget(null);
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function saveCroppedAvatar(dataUrl: string) {
+    if (!avatarTarget) return;
+    try {
+      const updated = await api.setAvatar(avatarTarget, dataUrl);
       setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setAvatarBusy(false);
+      setCropFile(null);
       setAvatarTarget(null);
     }
   }
@@ -226,6 +227,7 @@ export default function CompanionsPage() {
                   </button>
                   {menuId === item.id && (
                     <div className="menu">
+                      <Link to={`/companions/${item.id}/persona`}>人设</Link>
                       <Link to={`/companions/${item.id}/memories`}>记忆</Link>
                       <Link to={`/companions/${item.id}/roleplay`}>演练</Link>
                       {item.avatar && (
@@ -251,6 +253,15 @@ export default function CompanionsPage() {
         accept="image/png,image/jpeg,image/webp"
         style={{ display: "none" }}
         onChange={(event) => void onAvatarFile(event)}
+      />
+
+      <AvatarCropper
+        file={cropFile}
+        onCancel={() => {
+          setCropFile(null);
+          setAvatarTarget(null);
+        }}
+        onSave={(dataUrl) => void saveCroppedAvatar(dataUrl)}
       />
 
       {deleteTarget && (
@@ -284,3 +295,5 @@ export default function CompanionsPage() {
     </div>
   );
 }
+
+

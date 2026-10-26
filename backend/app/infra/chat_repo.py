@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.ids import new_ulid
 from app.domain.chat import MessageRecord, SessionRecord
 from app.models.chat import ChatMessage, ChatSession
 
@@ -19,7 +20,13 @@ class SqlChatRepository:
         self, user_id: str, companion_id: int, title: str = ""
     ) -> SessionRecord:
         async with self._session_factory() as session:
-            row = ChatSession(user_id=user_id, companion_id=companion_id, title=title)
+            row = ChatSession(
+                user_id=user_id,
+                companion_id=companion_id,
+                title=title,
+                ulid=new_ulid(),
+                origin_device_id="local",
+            )
             session.add(row)
             await session.commit()
             return SessionRecord(
@@ -79,6 +86,7 @@ class SqlChatRepository:
                     ChatMessage.session_id == session_id,
                     ChatSession.user_id == user_id,
                     ChatSession.deleted_at.is_(None),
+                    ChatMessage.deleted_at.is_(None),
                 )
             )
             if before_seq is not None:
@@ -100,6 +108,7 @@ class SqlChatRepository:
                         ChatSession.companion_id == companion_id,
                         ChatSession.user_id == user_id,
                         ChatSession.deleted_at.is_(None),
+                        ChatMessage.deleted_at.is_(None),
                     )
                     .order_by(ChatMessage.id.desc())
                     .limit(1)
@@ -140,6 +149,8 @@ class SqlChatRepository:
                 role=role,
                 content=content,
                 client_request_id=client_request_id,
+                ulid=new_ulid(),
+                origin_device_id="local",
             )
             session.add(row)
             chat_session = await session.get(ChatSession, session_id)
@@ -266,12 +277,14 @@ class SqlChatRepository:
                         ChatMessage.id == message_id,
                         ChatSession.user_id == user_id,
                         ChatSession.deleted_at.is_(None),
+                        ChatMessage.deleted_at.is_(None),
                     )
                 )
             ).scalar_one_or_none()
             if row is None:
                 return False
-            await session.delete(row)
+            # 同步预留：保留墓碑，不物理删除
+            row.deleted_at = datetime.now(UTC)
             await session.commit()
             return True
 
