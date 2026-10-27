@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import AdminSettingsCard from "../components/AdminSettingsCard";
 import ProviderSettingsList from "../components/ProviderSettingsList";
+import VoiceSettingsCard from "../components/VoiceSettingsCard";
 import type { Provider, UsageSummary } from "../types";
 
 export default function SettingsPage() {
@@ -48,6 +49,8 @@ export default function SettingsPage() {
 
       <AdminSettingsCard />
 
+      <VoiceSettingsCard />
+
       <h2 style={{ marginTop: 18 }}>供应商</h2>
       <ProviderSettingsList providers={providers} onChanged={() => void reload()} />
       <h2 style={{ marginTop: 18 }}>最近 7 天用量</h2>
@@ -71,4 +74,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
 

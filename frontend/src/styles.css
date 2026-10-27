@@ -972,3 +972,57 @@ label {
   max-height: 180px;
   overflow-y: auto;
 }
+
+/* ---------- 语音 ---------- */
+.voice-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger, #d33);
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.voice-timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.voice-meter {
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.voice-meter-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+.voice-error {
+  color: var(--danger, #c33);
+  font-size: 13px;
+}
+
+.voice-playing {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

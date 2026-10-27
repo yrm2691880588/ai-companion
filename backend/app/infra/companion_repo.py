@@ -67,6 +67,8 @@ class SqlCompanionRepository:
                 memory_enabled=True,
                 avatar=companion.avatar,
                 derived_from=companion.derived_from,
+                voice_id=companion.voice_id,
+                voice_params=companion.voice_params,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at or datetime.now(UTC),
             )
@@ -148,6 +150,8 @@ class SqlCompanionRepository:
                 memory_enabled=companion.memory_enabled,
                 avatar=companion.avatar,
                 derived_from=companion.derived_from,
+                voice_id=companion.voice_id,
+                voice_params=companion.voice_params,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at,
             )
@@ -207,6 +211,26 @@ class SqlCompanionRepository:
             await session.commit()
             return await self.get(user_id, companion_id)
 
+    async def set_voice(
+        self, user_id: str, companion_id: int, voice_id: str | None
+    ) -> CompanionRecord | None:
+        async with self._session_factory() as session:
+            companion = (
+                await session.execute(
+                    select(Companion).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if companion is None:
+                return None
+            companion.voice_id = voice_id
+            companion.updated_at = datetime.now(UTC)
+            await session.commit()
+            return await self.get(user_id, companion_id)
+
 
 def _to_record(companion: Companion, persona_row: CompanionPersona) -> CompanionRecord:
     persona = Persona.model_validate(persona_row.persona)
@@ -220,6 +244,8 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         memory_enabled=companion.memory_enabled,
         avatar=companion.avatar,
         derived_from=companion.derived_from,
+        voice_id=companion.voice_id,
+        voice_params=companion.voice_params,
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )

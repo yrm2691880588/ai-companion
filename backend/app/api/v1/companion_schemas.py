@@ -67,6 +67,7 @@ class CompanionOut(BaseModel):
     memory_enabled: bool = True
     avatar: str | None = None
     derived_from: int | None = None
+    voice_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -82,6 +83,10 @@ class DeriveIn(BaseModel):
 
 class AvatarIn(BaseModel):
     avatar: str | None = Field(default=None, max_length=500_000)
+
+
+class VoiceIn(BaseModel):
+    voice_id: str | None = Field(default=None, max_length=128)
 
 
 class DimensionPatchIn(BaseModel):

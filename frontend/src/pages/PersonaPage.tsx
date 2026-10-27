@@ -4,6 +4,7 @@ import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
 import { track } from "../analytics";
 import UserProfileForm from "../components/UserProfileForm";
+import VoicePicker from "../components/VoicePicker";
 import type { Companion, Persona } from "../types";
 
 export default function PersonaPage() {
@@ -15,6 +16,7 @@ export default function PersonaPage() {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     api
@@ -66,6 +68,7 @@ export default function PersonaPage() {
       </div>
 
       {error && <div className="alert">{error}</div>}
+      {notice && <div className="toast">{notice}</div>}
 
       <div className="notice" style={{ marginTop: 12 }}>
         修改后不会覆盖当前伴侣，而是用这版人设创建一个新伴侣；原来的会话、记忆和头像都保持不变。
@@ -76,6 +79,25 @@ export default function PersonaPage() {
           value={draft}
           onChange={setDraft}
           disabled={!editing || busy}
+        />
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <VoicePicker
+          companionId={companionId}
+          value={companion?.voice_id ?? null}
+          onChange={(voiceId) => {
+            void (async () => {
+              try {
+                const updated = await api.setCompanionVoice(companionId, voiceId);
+                setCompanion(updated);
+                setNotice("音色已保存，下一条语音生效");
+                window.setTimeout(() => setNotice(""), 2500);
+              } catch (event) {
+                setError((event as Error).message);
+              }
+            })();
+          }}
         />
       </div>
 
@@ -107,5 +129,8 @@ export default function PersonaPage() {
     </div>
   );
 }
+
+
+
 
 

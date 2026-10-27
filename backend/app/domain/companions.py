@@ -41,6 +41,8 @@ class CompanionRecord:
     memory_enabled: bool = True
     avatar: str | None = None
     derived_from: int | None = None
+    voice_id: str | None = None
+    voice_params: dict[str, Any] | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -89,6 +91,10 @@ class CompanionRepository(Protocol):
 
     async def set_avatar(
         self, user_id: str, companion_id: int, avatar: str | None
+    ) -> CompanionRecord | None: ...
+
+    async def set_voice(
+        self, user_id: str, companion_id: int, voice_id: str | None
     ) -> CompanionRecord | None: ...
 
 
@@ -168,6 +174,16 @@ class InMemoryCompanionRepository:
         if item is None:
             return None
         item.avatar = avatar
+        item.updated_at = datetime.now(UTC)
+        return item
+
+    async def set_voice(
+        self, user_id: str, companion_id: int, voice_id: str | None
+    ) -> CompanionRecord | None:
+        item = await self.get(user_id, companion_id)
+        if item is None:
+            return None
+        item.voice_id = voice_id
         item.updated_at = datetime.now(UTC)
         return item
 
@@ -365,6 +381,17 @@ class CompanionService:
         if not await self._repo.set_memory_enabled(user_id, companion_id, enabled):
             raise NotFound("伴侣不存在")
         return await self.get(user_id, companion_id)
+
+    async def set_voice(
+        self, user_id: str, companion_id: int, voice_id: str | None
+    ) -> CompanionRecord:
+        cleaned = (voice_id or "").strip() or None
+        if cleaned is not None and len(cleaned) > 128:
+            raise InvalidInput("音色标识过长", code="VOICE_ID_INVALID")
+        updated = await self._repo.set_voice(user_id, companion_id, cleaned)
+        if updated is None:
+            raise NotFound("伴侣不存在")
+        return updated
 
     async def set_avatar(
         self, user_id: str, companion_id: int, avatar: str | None

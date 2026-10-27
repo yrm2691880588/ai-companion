@@ -98,8 +98,16 @@ def test_synthesize_failure_propagates(tmp_path: Path) -> None:
 
 
 def test_cleanup_removes_old_files(tmp_path: Path) -> None:
-    store = AudioStore(tmp_path, ttl_seconds=0)
+    import os
+    import time
+
+    store = AudioStore(tmp_path, ttl_seconds=30)
     audio_id = store.save(b"data")
-    assert store.path_for(audio_id) is None  # ttl=0 立即过期
-    removed = store.cleanup(max_age_seconds=0)
+    path = store.path_for(audio_id)
+    assert path is not None
+    # 把文件时间戳拨到 10 分钟前，模拟过期
+    past = time.time() - 600
+    os.utime(path, (past, past))
+    assert store.path_for(audio_id) is None
+    removed = store.cleanup(max_age_seconds=60)
     assert removed == 1

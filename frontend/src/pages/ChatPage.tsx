@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
 import { track } from "../analytics";
+import VoiceBar from "../components/VoiceBar";
+import { playAudio } from "../voice";
 import type { Companion, Message, Session } from "../types";
 
 const STICK_THRESHOLD = 80;
@@ -46,6 +48,10 @@ export default function ChatPage() {
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [openerLoading, setOpenerLoading] = useState(false);
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const stopPlayRef = useRef<(() => void) | null>(null);
   const [showJump, setShowJump] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -77,6 +83,12 @@ export default function ChatPage() {
         ]);
         setCompanion(loaded);
         setSessions(list);
+        void api
+          .voiceProviders()
+          .then((providers) => {
+            setVoiceAvailable(providers.some((item) => item.configured && item.enabled));
+          })
+          .catch(() => setVoiceAvailable(false));
         if (list.length > 0) {
           await selectSession(list[0].id);
         } else {
@@ -141,8 +153,8 @@ export default function ChatPage() {
     }
   }
 
-  async function send() {
-    const text = draft.trim();
+  async function send(explicitText?: string) {
+    const text = (explicitText ?? draft).trim();
     if (!text || !sessionId || streaming) return;
     setDraft("");
     if (composerRef.current) composerRef.current.style.height = "auto";
@@ -187,7 +199,26 @@ export default function ChatPage() {
                 setEcho({ messageId: list[list.length - 1].id, items: data.memories });
               }
               setSessions(await api.sessions(companionId));
-      
+              const voiceId = companion?.voice_id;
+              if (voiceOn && voiceId) {
+                const last = list[list.length - 1];
+                if (last && last.role === "assistant" && last.content.trim()) {
+                  try {
+                    const speech = await api.synthesize(last.content, voiceId, {
+                      sessionId,
+                    });
+                    stopPlayRef.current?.();
+                    setSpeaking(true);
+                    stopPlayRef.current = playAudio(speech.audio_url, () => {
+                      setSpeaking(false);
+                      stopPlayRef.current = null;
+                    });
+                  } catch {
+                    setNotice("这条语音没出来，先看文字吧");
+                    window.setTimeout(() => setNotice(""), 2500);
+                  }
+                }
+              }
             })();
           },
         },
@@ -574,6 +605,51 @@ export default function ChatPage() {
               </button>
             )}
           </div>
+
+          <div className="row" style={{ gap: 8, marginTop: 8, alignItems: "center" }}>
+            <button
+              className={voiceOn ? "btn primary" : "btn ghost"}
+              onClick={() => {
+                if (!voiceAvailable) {
+                  setNotice("先到「模型与用量 → 语音」配置火山 AppID 与 Token");
+                  window.setTimeout(() => setNotice(""), 3000);
+                  return;
+                }
+                setVoiceOn(!voiceOn);
+                if (voiceOn) {
+                  stopPlayRef.current?.();
+                  stopPlayRef.current = null;
+                  setSpeaking(false);
+                }
+              }}
+              title={voiceOn ? "关闭语音模式" : "开启语音模式：说话后她会语音回复"}
+            >
+              {voiceOn ? "语音模式：开" : "语音模式：关"}
+            </button>
+            {voiceOn && (
+              <VoiceBar available={voiceAvailable} onTranscribed={(text) => void send(text)} />
+            )}
+            {speaking && (
+              <span className="voice-playing">
+                <span className="muted">她在说话…</span>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    stopPlayRef.current?.();
+                    stopPlayRef.current = null;
+                    setSpeaking(false);
+                  }}
+                >
+                  停止
+                </button>
+              </span>
+            )}
+            {voiceOn && (
+              <span className="muted" style={{ fontSize: 12 }}>
+                语音比文字贵，按供应商实际计费
+              </span>
+            )}
+          </div>
         </section>
       </div>
 
@@ -600,6 +676,9 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
+
 
 
 

@@ -21,6 +21,9 @@ import type {
   Summary,
   Template,
   UsageSummary,
+  VoiceOption,
+  VoiceProvider,
+  VoiceSynthesis,
   UserProfile,
 } from "./types";
 
@@ -319,6 +322,71 @@ export const api = {
       { method: "POST" },
     );
   },
+  async setCompanionVoice(id: number, voiceId: string | null): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}/voice`, {
+      method: "PUT",
+      body: JSON.stringify({ voice_id: voiceId }),
+    });
+  },
+  async voiceProviders(): Promise<VoiceProvider[]> {
+    return request<VoiceProvider[]>("/v1/voice/providers");
+  },
+  async saveVoiceProvider(
+    key: string,
+    patch: {
+      app_id?: string;
+      token?: string;
+      cluster?: string;
+      base_url?: string | null;
+      enabled?: boolean;
+    },
+  ): Promise<VoiceProvider> {
+    return request<VoiceProvider>(`/v1/voice/providers/${key}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+  async probeVoiceProvider(key: string): Promise<{ ok: boolean; voice_count?: number }> {
+    return request<{ ok: boolean; voice_count?: number }>(
+      `/v1/voice/providers/${key}/probe`,
+      { method: "POST" },
+    );
+  },
+  async voiceOptions(key: string, refresh = false): Promise<VoiceOption[]> {
+    return request<VoiceOption[]>(
+      `/v1/voice/providers/${key}/voices${refresh ? "?refresh=true" : ""}`,
+    );
+  },
+  async transcribe(audio: Blob, providerKey = "volcengine"): Promise<{ text: string; duration_ms: number }> {
+    const form = new FormData();
+    form.append("file", audio, "voice.webm");
+    const response = await fetch(`/v1/voice/transcribe?provider_key=${providerKey}`, {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || `识别失败（${response.status}）`);
+    }
+    return (await response.json()) as { text: string; duration_ms: number };
+  },
+  async synthesize(
+    text: string,
+    voiceId: string,
+    options: { providerKey?: string; params?: Record<string, unknown>; sessionId?: number } = {},
+  ): Promise<VoiceSynthesis> {
+    return request<VoiceSynthesis>("/v1/voice/synthesize", {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        voice_id: voiceId,
+        provider_key: options.providerKey ?? "volcengine",
+        params: options.params ?? null,
+        session_id: options.sessionId ?? null,
+      }),
+    });
+  },
   async getProfile(): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile");
   },
@@ -353,6 +421,8 @@ export const api = {
     });
   },
 };
+
+
 
 
 

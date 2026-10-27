@@ -22,6 +22,8 @@ export interface Companion {
   memory_enabled: boolean;
   avatar?: string | null;
   derived_from?: number | null;
+  voice_id?: string | null;
+  voice_params?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -244,4 +246,26 @@ export interface ProviderSetting {
 export interface DiscoveredModel {
   id: string;
   owned_by: string;
+}
+
+export interface VoiceProvider {
+  key: string;
+  display_name: string;
+  supports_cloning: boolean;
+  configured: boolean;
+  enabled: boolean;
+  app_id: string;
+}
+
+export interface VoiceOption {
+  voice_id: string;
+  display_name: string;
+  gender: string;
+  tags: string[];
+  params_schema: Record<string, unknown>;
+}
+
+export interface VoiceSynthesis {
+  audio_url: string;
+  expires_in: number;
 }

@@ -17,6 +17,7 @@ from app.api.v1.companion_schemas import (
     DimensionRegenerateOut,
     PersonaPutIn,
     TemplateCreateIn,
+    VoiceIn,
 )
 from app.api.v1.personas import request_id
 from app.domain.companions import CompanionRecord, CompanionService
@@ -34,6 +35,7 @@ def _out(record: CompanionRecord) -> CompanionOut:
         memory_enabled=record.memory_enabled,
         avatar=record.avatar,
         derived_from=record.derived_from,
+        voice_id=record.voice_id,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -165,3 +167,15 @@ async def delete_companion(
     job = await deletion.enqueue(user_id, companion_id)
     background.add_task(deletion.run_job, job.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/{companion_id}/voice", response_model=CompanionOut)
+async def set_companion_voice(
+    companion_id: int,
+    payload: VoiceIn,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> CompanionOut:
+    record = await service.set_voice(user_id, companion_id, payload.voice_id)
+    return _out(record)
+
