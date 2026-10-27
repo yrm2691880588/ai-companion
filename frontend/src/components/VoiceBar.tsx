@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { formatDuration, isRecordingSupported, startRecording } from "../voice";
-import type { Recorder } from "../voice";
+import { formatDuration, isRecordingSupported, startRecording } from "../lib/voice";
+import type { Recorder } from "../lib/voice";
 
 interface Props {
   /** 识别出文字后交给对话页去发送 */
@@ -122,3 +122,4 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
     </div>
   );
 }
+

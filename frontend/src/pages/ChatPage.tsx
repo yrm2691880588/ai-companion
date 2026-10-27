@@ -1,12 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
-import { track } from "../analytics";
+import { track } from "../lib/analytics";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import VoiceBar from "../components/VoiceBar";
-import { playAudio } from "../voice";
-import type { Companion, Message, Session } from "../types";
+import { playAudio } from "../lib/voice";
+import type { Companion, Message, Session } from "../lib/types";
 
 const STICK_THRESHOLD = 80;
 
@@ -689,6 +689,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
 
 
 

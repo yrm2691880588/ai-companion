@@ -4,7 +4,7 @@ import { api } from "../api";
 import AdminSettingsCard from "../components/AdminSettingsCard";
 import ProviderSettingsList from "../components/ProviderSettingsList";
 import VoiceSettingsCard from "../components/VoiceSettingsCard";
-import type { Provider, UsageSummary } from "../types";
+import type { Provider, UsageSummary } from "../lib/types";
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -74,5 +74,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+
 
 

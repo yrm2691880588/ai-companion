@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PRESETS, loadTheme, saveTheme, type ThemeState } from "../theme";
+import { PRESETS, loadTheme, saveTheme, type ThemeState } from "../lib/theme";
 
 export default function AppearanceCard() {
   const [theme, setTheme] = useState<ThemeState>(() => loadTheme());
@@ -65,4 +65,5 @@ export default function AppearanceCard() {
     </div>
   );
 }
+
 

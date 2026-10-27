@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { playAudio } from "../voice";
-import type { VoiceOption } from "../types";
+import { playAudio } from "../lib/voice";
+import type { VoiceOption } from "../lib/types";
 
 interface Props {
   companionId: number;
@@ -103,3 +103,4 @@ export default function VoicePicker({ companionId, value, onChange }: Props) {
     </div>
   );
 }
+

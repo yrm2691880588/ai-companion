@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { VoiceProvider } from "../types";
+import type { VoiceProvider } from "../lib/types";
 
 const GUIDE_STEPS = [
   {
@@ -171,3 +171,4 @@ export default function VoiceSettingsCard() {
     </div>
   );
 }
+

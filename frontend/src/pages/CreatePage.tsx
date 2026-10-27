@@ -4,8 +4,8 @@ import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
 import TrialChat from "../components/TrialChat";
 import PersonaImportButton from "../components/PersonaImport";
-import { track } from "../analytics";
-import type { Persona, Template } from "../types";
+import { track } from "../lib/analytics";
+import type { Persona, Template } from "../lib/types";
 
 export default function CreatePage() {
   const navigate = useNavigate();
@@ -164,6 +164,7 @@ export default function CreatePage() {
     </div>
   );
 }
+
 
 
 

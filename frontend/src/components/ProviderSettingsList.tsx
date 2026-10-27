@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import Modal from "./Modal";
-import type { DiscoveredModel, Provider, ProviderSetting } from "../types";
+import type { DiscoveredModel, Provider, ProviderSetting } from "../lib/types";
 
 interface Props {
   providers: Provider[];
@@ -246,6 +246,7 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
     </div>
   );
 }
+
 
 
 

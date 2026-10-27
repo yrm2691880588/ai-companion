@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
-import type { Companion, Review, Run, Scenario } from "../types";
+import type { Companion, Review, Run, Scenario } from "../lib/types";
 
 interface Line {
   id: number;
@@ -270,3 +270,4 @@ function labelOf(key: string): string {
   };
   return labels[key] ?? key;
 }
+

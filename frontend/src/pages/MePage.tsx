@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import AppearanceCard from "../components/AppearanceCard";
 import UserProfileForm from "../components/UserProfileForm";
-import type { Provider, UsageSummary } from "../types";
+import type { Provider, UsageSummary } from "../lib/types";
 
 export default function MePage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -85,3 +85,4 @@ export default function MePage() {
     </div>
   );
 }
+

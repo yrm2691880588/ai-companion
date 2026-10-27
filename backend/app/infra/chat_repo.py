@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.device import current_device_id
 from app.core.ids import new_ulid
 from app.domain.chat import MessageRecord, SessionRecord
 from app.domain.sync import record
@@ -26,7 +27,7 @@ class SqlChatRepository:
                 companion_id=companion_id,
                 title=title,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
             )
             session.add(row)
             await session.flush()
@@ -160,7 +161,7 @@ class SqlChatRepository:
                 content=content,
                 client_request_id=client_request_id,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
             )
             session.add(row)
             chat_session = await session.get(ChatSession, session_id)

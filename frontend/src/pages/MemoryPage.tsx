@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
-import type { Companion, Memory } from "../types";
+import type { Companion, Memory } from "../lib/types";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -120,4 +120,5 @@ export default function MemoryPage() {
     </div>
   );
 }
+
 

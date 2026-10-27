@@ -1,4 +1,4 @@
-import type { Persona } from "../types";
+import type { Persona } from "../lib/types";
 
 interface Props {
   value: Persona;
@@ -134,3 +134,4 @@ export default function PersonaForm({ value, onChange, disabled }: Props) {
     </div>
   );
 }
+

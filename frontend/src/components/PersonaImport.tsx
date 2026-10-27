@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import Modal from "./Modal";
 import PersonaForm from "./PersonaForm";
-import type { Companion, Persona } from "../types";
+import type { Companion, Persona } from "../lib/types";
 
 export function downloadPersona(companion: Companion): void {
   const payload = {
@@ -119,5 +119,6 @@ export default function PersonaImportButton({ onCreated }: Props) {
     </>
   );
 }
+
 
 

@@ -1,3 +1,4 @@
+import { apiUrl, authHeaders } from "./lib/client";
 import type {
   Account,
   AdminSettings,
@@ -25,17 +26,9 @@ import type {
   VoiceProvider,
   VoiceSynthesis,
   UserProfile,
-} from "./types";
+} from "./lib/types";
 
-const USER_KEY = "ai-companion-user-id";
-
-export function getUserId(): string {
-  return localStorage.getItem(USER_KEY) || "dev-user";
-}
-
-export function setUserId(value: string): void {
-  localStorage.setItem(USER_KEY, value.trim() || "dev-user");
-}
+export { getUserId, setUserId, getDeviceId, apiUrl } from "./lib/client";
 
 export class ApiError extends Error {
   code: string;
@@ -46,11 +39,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-User-Id": getUserId(),
+      ...authHeaders(),
       ...(init?.headers ?? {}),
     },
   });
@@ -87,11 +80,11 @@ export async function streamEvents(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-User-Id": getUserId(),
+      ...authHeaders(),
       Accept: "text/event-stream",
     },
     body: JSON.stringify(body),
@@ -177,9 +170,9 @@ export const api = {
     });
   },
   async trialChat(persona: Persona, content: string, trialId?: string): Promise<Response> {
-    return fetch("/v1/trial/chat", {
+    return fetch(apiUrl("/v1/trial/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Id": getUserId() },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ persona, content, trial_id: trialId }),
     });
   },
@@ -360,7 +353,7 @@ export const api = {
   async transcribe(audio: Blob, providerKey = "volcengine"): Promise<{ text: string; duration_ms: number }> {
     const form = new FormData();
     form.append("file", audio, "voice.webm");
-    const response = await fetch(`/v1/voice/transcribe?provider_key=${providerKey}`, {
+    const response = await fetch(apiUrl(`/v1/voice/transcribe?provider_key=${providerKey}`), {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -421,6 +414,10 @@ export const api = {
     });
   },
 };
+
+
+
+
 
 
 

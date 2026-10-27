@@ -4,7 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./styles.css";
-import { applyTheme, loadTheme } from "./theme";
+import { applyTheme, loadTheme } from "./lib/theme";
 
 applyTheme(loadTheme());
 
@@ -17,3 +17,4 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
+

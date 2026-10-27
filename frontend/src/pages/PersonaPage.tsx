@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
-import { track } from "../analytics";
+import { track } from "../lib/analytics";
 import UserProfileForm from "../components/UserProfileForm";
 import VoicePicker from "../components/VoicePicker";
-import type { Companion, Persona } from "../types";
+import type { Companion, Persona } from "../lib/types";
 
 export default function PersonaPage() {
   const { id } = useParams();
@@ -129,6 +129,7 @@ export default function PersonaPage() {
     </div>
   );
 }
+
 
 
 

@@ -19,6 +19,7 @@ from app.api.v1.auth import me_router as me_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.companions import router as companions_router
+from app.api.v1.device import router as device_router
 from app.api.v1.export import router as export_router
 from app.api.v1.memories import router as memories_router
 from app.api.v1.models import router as models_router
@@ -33,6 +34,7 @@ from app.api.v1.usage import router as usage_router
 from app.api.v1.user_profile import router as user_profile_router
 from app.api.v1.voice import router as voice_router
 from app.core.config import Settings, get_settings
+from app.core.device import DEVICE_HEADER, device_scope
 from app.core.errors import AppError
 from app.domain.auth import AuthRepository, AuthService
 from app.domain.chat import ChatRepository, ChatService, ChatStreamer
@@ -281,6 +283,13 @@ def create_app(
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    # 设备标识：写入数据时记录来源设备，便于跨端冲突判定
+    @app.middleware("http")
+    async def _attach_device(request: Request, call_next: Any) -> Any:
+        with device_scope(request.headers.get(DEVICE_HEADER)):
+            return await call_next(request)
+
     app.state.settings = resolved
     app.state.registry = registry
     app.state.provider_settings_service = provider_settings_service
@@ -365,6 +374,7 @@ def create_app(
     app.include_router(quota_router)
     app.include_router(auth_router)
     app.include_router(me_router)
+    app.include_router(device_router)
     app.include_router(export_router)
     app.include_router(admin_router)
     app.include_router(chat_router)

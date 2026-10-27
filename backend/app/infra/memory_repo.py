@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.device import current_device_id
 from app.core.ids import new_ulid
 from app.domain.memory import MemoryRecord, normalize_content
 from app.models.memory import Memory
@@ -40,7 +41,7 @@ class SqlMemoryRepository:
                 source_session_id=source_session_id,
                 source_message_id=source_message_id,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
             )
             session.add(row)
             await session.commit()

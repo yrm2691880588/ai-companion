@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { AdminSettingsResponse, ModelDefaults } from "../types";
+import type { AdminSettingsResponse, ModelDefaults } from "../lib/types";
 
 export default function AdminSettingsCard() {
   const [admin, setAdmin] = useState<AdminSettingsResponse | null>(null);
@@ -131,4 +131,5 @@ export default function AdminSettingsCard() {
     </div>
   );
 }
+
 

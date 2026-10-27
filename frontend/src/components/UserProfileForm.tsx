@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import type { UserProfile } from "../types";
+import type { UserProfile } from "../lib/types";
 
 interface Props {
   companionId?: number;
@@ -137,3 +137,4 @@ export default function UserProfileForm({ companionId, title, description }: Pro
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../api";
 import Modal from "./Modal";
-import type { Persona } from "../types";
+import type { Persona } from "../lib/types";
 
 interface Props {
   persona: Persona;
@@ -131,4 +131,5 @@ export default function TrialChat({ persona, onClose }: Props) {
     </Modal>
   );
 }
+
 

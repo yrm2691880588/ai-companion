@@ -116,6 +116,25 @@ pnpm dev
 
 > 手机端访问：把 `AI_COMPANION_LISTEN_LAN=true` 与 `AI_COMPANION_CORS_ORIGINS` 一起配好，用手机浏览器打开 `http://<电脑局域网IP>:8000`。
 
+### 跨端与 PWA
+
+前端已构建为可安装的 PWA，手机浏览器打开后可「添加到主屏幕」，以独立窗口运行：
+
+| 能力 | 说明 |
+|---|---|
+| 离线壳 | 静态资源由 Service Worker 预缓存，断网时界面仍能打开 |
+| 接口不走缓存 | 所有 `/v1/*` 请求强制 `NetworkOnly`，避免读到过期数据 |
+| 设备标识 | 首次打开生成 ULID 存本地，随请求头发送，用于跨端来源判定 |
+| API 基地址 | 可用 `VITE_API_BASE` 指定后端地址（默认同源） |
+
+构建前端时如需指向别的后端：
+
+```powershell
+cd frontend
+$env:VITE_API_BASE = "http://192.168.1.10:8000"
+pnpm build
+```
+
 ## 验证
 
 ```powershell
@@ -198,3 +217,4 @@ Invoke-RestMethod "http://127.0.0.1:8000/v1/me/usage/models?days=7" -Headers @{ 
 | [V1.2_产品体验体检与新阶段立项.md](docs/V1.2_产品体验体检与新阶段立项.md) | V1.2 立项与体验体检 |
 | [V1.2_首批快赢.md](docs/V1.2_首批快赢.md) | V1.2 首批快赢项 |
 | [V1.2_第二批.md](docs/V1.2_第二批.md) | V1.2 第二批规划 |
+

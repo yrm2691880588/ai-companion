@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.device import current_device_id
 from app.core.ids import new_ulid
 from app.domain.companions import CompanionRecord
 from app.domain.persona import Persona
@@ -41,7 +42,7 @@ class SqlCompanionRepository:
                 current_version=1,
                 memory_enabled=True,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
                 derived_from=derived_from,
             )
             session.add(companion)
@@ -53,7 +54,7 @@ class SqlCompanionRepository:
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
                     ulid=new_ulid(),
-                    origin_device_id="local",
+                    origin_device_id=current_device_id(),
                 )
             )
             await session.commit()
@@ -134,7 +135,7 @@ class SqlCompanionRepository:
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
                     ulid=new_ulid(),
-                    origin_device_id="local",
+                    origin_device_id=current_device_id(),
                 )
             )
             companion.current_version = version

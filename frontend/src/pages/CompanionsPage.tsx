@@ -6,7 +6,7 @@ import AvatarCropper from "../components/AvatarCropper";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import { downloadPersona } from "../components/PersonaImport";
-import type { Companion, Latest } from "../types";
+import type { Companion, Latest } from "../lib/types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -328,6 +328,7 @@ export default function CompanionsPage() {
     </div>
   );
 }
+
 
 
 
