@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
+import Modal from "./Modal";
 
 interface Props {
   file: File | null;
@@ -12,7 +13,7 @@ const OUTPUT_SIZE = 256;
 
 /**
  * 头像裁剪：交互交给 react-easy-crop（自带边界约束、滚轮缩放、双指手势），
- * 我这边只负责把裁剪区画到 canvas 并导出 JPEG。
+ * 弹窗行为交给 Modal（Radix Dialog），我这边只负责把裁剪区画到 canvas 导出 JPEG。
  */
 export default function AvatarCropper({ file, onCancel, onSave }: Props) {
   const [imageUrl, setImageUrl] = useState("");
@@ -36,15 +37,6 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
     setError("");
     return () => URL.revokeObjectURL(url);
   }, [file]);
-
-  useEffect(() => {
-    if (!file) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [file, onCancel]);
 
   const onCropComplete = useCallback((_croppedArea: Area, pixels: Area) => {
     setAreaPixels(pixels);
@@ -86,53 +78,14 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
   if (!file) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
-        <h2>调整头像</h2>
-        <p className="muted">
-          拖动图片调整位置；滚轮或下方滑杆缩放；圆形区域就是最终头像。
-        </p>
-        {error && <div className="alert">{error}</div>}
-
-        <div className="avatar-crop-box">
-          {imageUrl && (
-            <Cropper
-              image={imageUrl}
-              crop={crop}
-              zoom={zoom}
-              aspect={1}
-              cropShape="round"
-              showGrid={false}
-              minZoom={1}
-              maxZoom={5}
-              restrictPosition
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-              objectFit="contain"
-            />
-          )}
-          <img
-            ref={imageRef}
-            src={imageUrl}
-            alt=""
-            style={{ display: "none" }}
-            onLoad={() => setError("")}
-          />
-        </div>
-
-        <label className="muted" style={{ display: "block", marginTop: 10 }}>
-          缩放 {zoom.toFixed(1)}×
-        </label>
-        <input
-          type="range"
-          min={1}
-          max={5}
-          step={0.05}
-          value={zoom}
-          onChange={(event) => setZoom(Number(event.target.value))}
-        />
-        <div className="toolbar">
+    <Modal
+      open
+      onClose={onCancel}
+      title="调整头像"
+      description="拖动图片调整位置；滚轮或下方滑杆缩放；圆形区域就是最终头像。"
+      preventClose={busy}
+      footer={
+        <>
           <button className="primary" disabled={busy} onClick={() => void save()}>
             {busy ? "保存中…" : "保存头像"}
           </button>
@@ -149,8 +102,49 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
           >
             重置
           </button>
-        </div>
+        </>
+      }
+    >
+      {error && <div className="alert">{error}</div>}
+
+      <div className="avatar-crop-box">
+        {imageUrl && (
+          <Cropper
+            image={imageUrl}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            cropShape="round"
+            showGrid={false}
+            minZoom={1}
+            maxZoom={5}
+            restrictPosition
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+            objectFit="contain"
+          />
+        )}
+        <img
+          ref={imageRef}
+          src={imageUrl}
+          alt=""
+          style={{ display: "none" }}
+          onLoad={() => setError("")}
+        />
       </div>
-    </div>
+
+      <label className="muted" style={{ display: "block", marginTop: 10 }}>
+        缩放 {zoom.toFixed(1)}×
+      </label>
+      <input
+        type="range"
+        min={1}
+        max={5}
+        step={0.05}
+        value={zoom}
+        onChange={(event) => setZoom(Number(event.target.value))}
+      />
+    </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import Modal from "./Modal";
 import PersonaForm from "./PersonaForm";
 import type { Companion, Persona } from "../types";
 
@@ -91,28 +92,32 @@ export default function PersonaImportButton({ onCreated }: Props) {
       {error && <span className="muted"> {error}</span>}
 
       {draft && (
-        <div className="modal-backdrop" onClick={() => !busy && setDraft(null)}>
-          <div className="modal import-modal" onClick={(event) => event.stopPropagation()}>
-            <h2>预览导入的人设</h2>
-            <p className="muted">
-              这是文件里的内容。可以直接修改，确认后才会创建新伴侣；关闭不会保存。
-            </p>
-            {error && <div className="alert">{error}</div>}
-            <div className="import-form">
-              <PersonaForm value={draft} onChange={setDraft} disabled={busy} />
-            </div>
-            <div className="toolbar">
+        <Modal
+          open
+          onClose={() => !busy && setDraft(null)}
+          title="预览导入的人设"
+          description="这是文件里的内容。可以直接修改，确认后才会创建新伴侣；关闭不会保存。"
+          preventClose={busy}
+          className="import-modal"
+          footer={
+            <>
               <button className="primary" disabled={busy} onClick={() => void create()}>
                 {busy ? "创建中…" : "用这版人设创建伴侣"}
               </button>
               <button className="ghost" disabled={busy} onClick={() => setDraft(null)}>
                 取消
               </button>
-            </div>
+            </>
+          }
+        >
+          {error && <div className="alert">{error}</div>}
+          <div className="import-form">
+            <PersonaForm value={draft} onChange={setDraft} disabled={busy} />
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
 }
+
 

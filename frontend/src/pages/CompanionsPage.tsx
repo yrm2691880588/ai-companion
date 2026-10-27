@@ -3,6 +3,7 @@ import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
+import Modal from "../components/Modal";
 import { downloadPersona } from "../components/PersonaImport";
 import type { Companion, Latest } from "../types";
 
@@ -267,19 +268,14 @@ export default function CompanionsPage() {
       />
 
       {deleteTarget && (
-        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h2>删除「{deleteTarget.name}」</h2>
-            <p className="muted">
-              会一并删除她的会话、记忆与演练记录，且不可恢复。请输入名字确认：
-            </p>
-            <input
-              value={deleteName}
-              autoFocus
-              placeholder={deleteTarget.name}
-              onChange={(event) => setDeleteName(event.target.value)}
-            />
-            <div className="toolbar">
+        <Modal
+          open
+          onClose={() => !deleting && setDeleteTarget(null)}
+          title={`删除「${deleteTarget.name}」`}
+          description="会一并删除她的会话、记忆与演练记录，且不可恢复。请输入名字确认："
+          preventClose={deleting}
+          footer={
+            <>
               <button
                 className="danger"
                 disabled={deleting || deleteName.trim() !== deleteTarget.name}
@@ -290,13 +286,21 @@ export default function CompanionsPage() {
               <button className="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
                 取消
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <input
+            value={deleteName}
+            autoFocus
+            placeholder={deleteTarget.name}
+            onChange={(event) => setDeleteName(event.target.value)}
+          />
+        </Modal>
       )}
     </div>
   );
 }
+
 
 
 

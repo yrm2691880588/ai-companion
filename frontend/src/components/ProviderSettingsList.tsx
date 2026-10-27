@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import Modal from "./Modal";
 import type { DiscoveredModel, Provider, ProviderSetting } from "../types";
 
 interface Props {
@@ -170,79 +171,82 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
       </div>
 
       {editing && (
-        <div className="modal-backdrop" onClick={() => !busy && setEditing(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h2>配置供应商</h2>
-            <p className="muted">
-              只保存在本机；保存后立即生效，不需要重启。
-            </p>
-            {error && <div className="alert">{error}</div>}
-            <label htmlFor="provider-key">API Key</label>
-            <input
-              id="provider-key"
-              value={apiKey}
-              placeholder="留空则不修改现有 Key"
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <div className="toolbar" style={{ marginTop: 8 }}>
-              <button className="ghost" disabled={discovering} onClick={() => void discover()}>
-                {discovering ? "搜索中…" : "搜索该供应商的可用模型"}
-              </button>
-              <button className="ghost" onClick={() => void probe()}>
-                测试连接
-              </button>
-            </div>
-            {probeResult && <div className="notice">{probeResult}</div>}
-            {discoverError && <div className="alert">{discoverError}</div>}
-            {discovered.length > 0 && (
-              <div className="discovered">
-                <p className="muted">
-                  找到 {discovered.length} 个模型（点击下方按钮加入本机模型列表）：
-                </p>
-                <div>
-                  {discovered.map((model) => (
-                    <span className="tag" key={model.id} title={model.owned_by}>
-                      {model.id}
-                    </span>
-                  ))}
-                </div>
-                <div className="toolbar">
-                  <button className="primary" disabled={discovering} onClick={() => void importAll()}>
-                    全部加入模型列表
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <label htmlFor="provider-url">Base URL</label>
-            <input
-              id="provider-url"
-              value={baseUrl}
-              placeholder="https://api.example.com/v1"
-              onChange={(event) => setBaseUrl(event.target.value)}
-            />
-            <label className="muted" style={{ display: "block", marginTop: 10 }}>
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(event) => setEnabled(event.target.checked)}
-              />{" "}
-              启用这个供应商
-            </label>
-            <div className="toolbar">
+        <Modal
+          open
+          onClose={() => !busy && setEditing(null)}
+          title="配置供应商"
+          description="只保存在本机；保存后立即生效，不需要重启。"
+          preventClose={busy}
+          footer={
+            <>
               <button className="primary" disabled={busy} onClick={() => void save()}>
                 {busy ? "保存中…" : "保存"}
               </button>
               <button className="ghost" disabled={busy} onClick={() => setEditing(null)}>
                 取消
               </button>
-            </div>
+            </>
+          }
+        >
+          {error && <div className="alert">{error}</div>}
+          <label htmlFor="provider-key">API Key</label>
+          <input
+            id="provider-key"
+            value={apiKey}
+            placeholder="留空则不修改现有 Key"
+            onChange={(event) => setApiKey(event.target.value)}
+          />
+          <div className="toolbar" style={{ marginTop: 8 }}>
+            <button className="ghost" disabled={discovering} onClick={() => void discover()}>
+              {discovering ? "搜索中…" : "搜索该供应商的可用模型"}
+            </button>
+            <button className="ghost" onClick={() => void probe()}>
+              测试连接
+            </button>
           </div>
-        </div>
+          {probeResult && <div className="notice">{probeResult}</div>}
+          {discoverError && <div className="alert">{discoverError}</div>}
+          {discovered.length > 0 && (
+            <div className="discovered">
+              <p className="muted">
+                找到 {discovered.length} 个模型（点击下方按钮加入本机模型列表）：
+              </p>
+              <div>
+                {discovered.map((model) => (
+                  <span className="tag" key={model.id} title={model.owned_by}>
+                    {model.id}
+                  </span>
+                ))}
+              </div>
+              <div className="toolbar">
+                <button className="primary" disabled={discovering} onClick={() => void importAll()}>
+                  全部加入模型列表
+                </button>
+              </div>
+            </div>
+          )}
+
+          <label htmlFor="provider-url">Base URL</label>
+          <input
+            id="provider-url"
+            value={baseUrl}
+            placeholder="https://api.example.com/v1"
+            onChange={(event) => setBaseUrl(event.target.value)}
+          />
+          <label className="muted" style={{ display: "block", marginTop: 10 }}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+            />{" "}
+            启用这个供应商
+          </label>
+        </Modal>
       )}
     </div>
   );
 }
+
 
 
 

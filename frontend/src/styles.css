@@ -516,22 +516,60 @@ label {
   color: var(--danger) !important;
 }
 
+/* Radix Overlay：只负责遮罩，定位交给下方的 .modal 包装层 */
 .modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(44, 36, 48, 0.35);
-  display: grid;
-  place-items: center;
-  padding: 16px;
   z-index: 50;
+  animation: modal-fade 0.14s ease-out;
 }
 
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Radix Content：自身固定居中，保留原有视觉 */
 .modal {
-  width: min(420px, 100%);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   background: var(--panel);
   border-radius: 16px;
   padding: 18px;
   box-shadow: 0 24px 60px rgba(44, 36, 48, 0.25);
+  z-index: 51;
+  animation: modal-pop 0.16s ease-out;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 关闭按钮（Radix 要求有无障碍关闭入口） */
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.modal-close:hover {
+  background: var(--panel-2);
+  color: var(--ink);
 }
 
 .skeleton-card {
@@ -1027,4 +1065,5 @@ label {
   gap: 8px;
   align-items: center;
 }
+
 

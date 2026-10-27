@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
 import { track } from "../analytics";
+import Modal from "../components/Modal";
 import VoiceBar from "../components/VoiceBar";
 import { playAudio } from "../voice";
 import type { Companion, Message, Session } from "../types";
@@ -654,28 +655,34 @@ export default function ChatPage() {
       </div>
 
       {confirm && (
-        <div className="modal-backdrop" onClick={() => !confirmBusy && setConfirm(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h2>{confirm.kind === "session" ? "删除会话" : "删除消息"}</h2>
-            <p className="muted">
-              {confirm.kind === "session"
-                ? `会删除「${confirm.title}」里的全部消息，不可恢复。`
-                : `确定删除这条消息吗？删除后不会出现在历史里。`}
-            </p>
-            <div className="toolbar">
+        <Modal
+          open
+          onClose={() => !confirmBusy && setConfirm(null)}
+          title={confirm.kind === "session" ? "删除会话" : "删除消息"}
+          description={
+            confirm.kind === "session"
+              ? `会删除「${confirm.title}」里的全部消息，不可恢复。`
+              : "确定删除这条消息吗？删除后不会出现在历史里。"
+          }
+          preventClose={confirmBusy}
+          footer={
+            <>
               <button className="danger" disabled={confirmBusy} onClick={() => void confirmDelete()}>
                 {confirmBusy ? "删除中…" : "确认删除"}
               </button>
               <button className="ghost" disabled={confirmBusy} onClick={() => setConfirm(null)}>
                 取消
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <></>
+        </Modal>
       )}
     </div>
   );
 }
+
 
 
 
