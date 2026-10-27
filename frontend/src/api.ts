@@ -1,3 +1,4 @@
+import { createParser } from "eventsource-parser";
 import { apiUrl, authHeaders } from "./lib/client";
 import type {
   Account,
@@ -97,34 +98,24 @@ export async function streamEvents(
     };
     throw new ApiError(payload.code ?? String(response.status), payload.message ?? "请求失败");
   }
+  // 分块解析交给 eventsource-parser：它按规范处理跨块截断、多行 data 与注释行
+  const parser = createParser({
+    onEvent: (message) => dispatchEvent(message.event ?? "message", message.data, handlers),
+  });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      handleBlock(block, handlers);
-      boundary = buffer.indexOf("\n\n");
-    }
+    parser.feed(decoder.decode(value, { stream: true }));
   }
 }
 
-function handleBlock(block: string, handlers: StreamHandlers): void {
-  let event = "message";
-  const dataLines: string[] = [];
-  for (const line of block.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-  }
-  if (dataLines.length === 0) return;
+function dispatchEvent(event: string, data: string, handlers: StreamHandlers): void {
+  if (!data) return;
   let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+    payload = JSON.parse(data) as Record<string, unknown>;
   } catch {
     return;
   }
