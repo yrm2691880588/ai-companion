@@ -6,6 +6,7 @@ on:
   pull_request:
 
 jobs:
+  # 门槛一：代码规范、类型、构建、纯逻辑单测。不依赖数据库。
   build:
     runs-on: ubuntu-latest
     defaults:
@@ -30,12 +31,32 @@ jobs:
       - name: 纯逻辑单测
         run: pnpm test
 
+  # 门槛二：真实页面验收。需要 Postgres 与一份可用的伴侣数据。
   page-check:
     runs-on: ubuntu-latest
     needs: build
-    defaults:
-      run:
-        working-directory: frontend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: companion
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d companion"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      AI_COMPANION_ENV: dev
+      AI_COMPANION_LOCAL_MODE: "true"
+      AI_COMPANION_LOCAL_USER_ID: local-user
+      AI_COMPANION_DATABASE_URL: postgresql+asyncpg://app:app@localhost:5432/companion
+      AI_COMPANION_DEBUG_AUTH: "false"
+      AI_COMPANION_SMS_DEBUG: "false"
+      AI_COMPANION_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,24 +67,48 @@ jobs:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile
-      - name: 安装 Playwright 浏览器
-        run: npx playwright install --with-deps chromium
-      - name: 启动后端
-        working-directory: .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: 前端依赖与构建
+        working-directory: frontend
         run: |
-          python3 -m venv backend/.venv
-          backend/.venv/bin/pip install -e "backend[dev]"
-          cd backend
-          .venv/bin/alembic upgrade head
-          .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8000/healthz > /dev/null; then break; fi
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: 后端依赖与迁移
+        working-directory: backend
+        run: |
+          uv sync --frozen --extra dev
+          uv run alembic upgrade head
+
+      - name: 播种验收数据（页面验收要求至少一个伴侣）
+        working-directory: backend
+        run: uv run python ../scripts/seed_ci_data.py
+
+      - name: 启动后端
+        working-directory: backend
+        run: |
+          uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8000/healthz > /dev/null; then
+              echo "后端已就绪"
+              exit 0
+            fi
             sleep 1
           done
+          echo "后端启动超时"
+          exit 1
+
+      - name: 安装 Playwright 浏览器
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
       - name: 页面验收
+        working-directory: frontend
         env:
           PW_CHANNEL: none
         run: pnpm test:page
-

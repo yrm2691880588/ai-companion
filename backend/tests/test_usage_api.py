@@ -55,7 +55,7 @@ def seeded_repo() -> InMemoryUsageRepository:
 
 
 def client(repo: InMemoryUsageRepository) -> TestClient:
-    settings = Settings(local_mode=False, env="test", _env_file=None)  # type: ignore[call-arg]
+    settings = Settings(local_mode=False, debug_auth=True, env="test", _env_file=None)  # type: ignore[call-arg]
     return TestClient(create_app(settings, usage_repo=repo))
 
 

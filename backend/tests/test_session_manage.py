@@ -38,7 +38,7 @@ class FakeStreamer:
 def client() -> TestClient:
     return TestClient(
         create_app(
-            Settings(local_mode=False, env="test", _env_file=None),  # type: ignore[call-arg]
+            Settings(local_mode=False, debug_auth=True, env="test", _env_file=None),  # type: ignore[call-arg]
             companion_repo=InMemoryCompanionRepository(),
             template_repo=InMemoryTemplateRepository(TEMPLATES),
             chat_repo=InMemoryChatRepository(),

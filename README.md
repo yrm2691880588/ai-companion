@@ -108,6 +108,13 @@ pnpm dev
 | `AI_COMPANION_DEEPSEEK_API_KEY` | 默认模型的官方 Key | 空 |
 | `AI_COMPANION_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 是否允许本地模型地址（Ollama 等） | `false` |
 | `AI_COMPANION_TURN_COST_CAP_CNY` | 单轮成本上限，用于倒推上下文预算 | `0.02` |
+| `AI_COMPANION_LOCAL_MODE` | 本地单用户免登录模式 | `true` |
+| `AI_COMPANION_DEBUG_AUTH` | 允许 `X-User-Id` 头冒充用户（**仅供本地调试**） | `false` |
+| `AI_COMPANION_LISTEN_LAN` | 监听 `0.0.0.0` 允许手机访问（由启动脚本读取） | `false` |
+| `AI_COMPANION_CORS_ORIGINS` | 允许跨端访问的前端来源，逗号分隔 | 空（只允许同源） |
+| `AI_COMPANION_AUDIO_DIR` | 语音音频临时目录 | 空（系统临时目录） |
+
+> 手机端访问：把 `AI_COMPANION_LISTEN_LAN=true` 与 `AI_COMPANION_CORS_ORIGINS` 一起配好，用手机浏览器打开 `http://<电脑局域网IP>:8000`。
 
 ## 验证
 
