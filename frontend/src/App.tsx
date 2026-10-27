@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
+import { track } from "./lib/analytics";
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const CompanionsPage = lazy(() => import("./pages/CompanionsPage"));
 const CreatePage = lazy(() => import("./pages/CreatePage"));
@@ -11,6 +12,11 @@ const RoleplayPage = lazy(() => import("./pages/RoleplayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 export default function App() {
+  // 每次应用启动上报一次，用于判断真实打开次数
+  useEffect(() => {
+    track("app_open");
+  }, []);
+
   return (
     <div className="app">
       <Toaster position="top-center" visibleToasts={3} duration={3000} />

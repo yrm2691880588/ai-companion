@@ -5,23 +5,6 @@ import PersonaForm from "./PersonaForm";
 import { personaSchema } from "../lib/forms";
 import type { Companion, Persona } from "../lib/types";
 
-export function downloadPersona(companion: Companion): void {
-  const payload = {
-    format: "ai-companion-persona",
-    version: 1,
-    exported_at: new Date().toISOString(),
-    persona: companion.persona,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${companion.name}-人设.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
 
 interface Props {
   onCreated: (companion: Companion) => void;

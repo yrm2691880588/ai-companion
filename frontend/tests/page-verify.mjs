@@ -142,14 +142,25 @@ check(
   (await page.getByRole("menuitem", { name: "导出人设" }).count()) > 0,
 );
 
-// 埋点：打开页面应产生 app_open
-const analyticsCount = await page.evaluate(async () => {
-  const response = await fetch("/v1/analytics/summary?days=1", { credentials: "same-origin" });
-  if (!response.ok) return -1;
-  const rows = await response.json();
-  return rows.filter((row) => row.name === "app_open").reduce((sum, row) => sum + row.count, 0);
-});
-check("埋点已记录 app_open", analyticsCount > 0, `计数 ${analyticsCount}`);
+// 埋点：验证「本次打开页面」确实产生了 app_open
+// 不依赖历史数据，也不依赖日期边界：取打开前的基线，再对比打开后的增量。
+const readAppOpen = () =>
+  page.evaluate(async () => {
+    const response = await fetch("/v1/analytics/summary?days=7", { credentials: "same-origin" });
+    if (!response.ok) return -1;
+    const rows = await response.json();
+    return rows.filter((row) => row.name === "app_open").reduce((sum, row) => sum + row.count, 0);
+  });
+
+const analyticsBefore = await readAppOpen();
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+const analyticsAfter = await readAppOpen();
+check(
+  "埋点已记录 app_open",
+  analyticsBefore >= 0 && analyticsAfter > analyticsBefore,
+  `计数 ${analyticsBefore} → ${analyticsAfter}`,
+);
 
 // 5) 头像裁剪弹窗（点击头像会触发系统文件选择，用 filechooser 接管）
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });

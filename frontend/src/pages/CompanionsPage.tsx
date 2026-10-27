@@ -7,7 +7,7 @@ import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
-import { downloadPersona } from "../components/PersonaImport";
+import { downloadPersona } from "../lib/persona-export";
 import type { Companion } from "../lib/types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {

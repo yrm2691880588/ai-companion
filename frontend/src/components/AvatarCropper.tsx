@@ -16,7 +16,13 @@ const OUTPUT_SIZE = 256;
  * 弹窗行为交给 Modal（Radix Dialog），我这边只负责把裁剪区画到 canvas 导出 JPEG。
  */
 export default function AvatarCropper({ file, onCancel, onSave }: Props) {
-  const [imageUrl, setImageUrl] = useState("");
+  // 换文件时用 key 重挂载，状态自然回到初值；不需要在 effect 里重置
+  if (!file) return null;
+  return <CropperDialog key={file.name + file.size} file={file} onCancel={onCancel} onSave={onSave} />;
+}
+
+function CropperDialog({ file, onCancel, onSave }: Props & { file: File }) {
+  const [imageUrl] = useState(() => URL.createObjectURL(file));
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [areaPixels, setAreaPixels] = useState<Area | null>(null);
@@ -24,19 +30,8 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
   const [error, setError] = useState("");
   const imageRef = useRef<HTMLImageElement | null>(null);
 
-  useEffect(() => {
-    if (!file) {
-      setImageUrl("");
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setImageUrl(url);
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setAreaPixels(null);
-    setError("");
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+  // effect 只负责释放外部资源，不碰状态
+  useEffect(() => () => URL.revokeObjectURL(imageUrl), [imageUrl]);
 
   const onCropComplete = useCallback((_croppedArea: Area, pixels: Area) => {
     setAreaPixels(pixels);
@@ -74,8 +69,6 @@ export default function AvatarCropper({ file, onCancel, onSave }: Props) {
       setBusy(false);
     }
   }
-
-  if (!file) return null;
 
   return (
     <Modal
