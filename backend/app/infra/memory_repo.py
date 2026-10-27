@@ -133,4 +133,3 @@ def _to_record(row: Memory) -> MemoryRecord:
         created_at=row.created_at,
         last_used_at=row.last_used_at,
     )
-

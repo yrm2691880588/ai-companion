@@ -136,9 +136,7 @@ async def test_transcribe_empty_text(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_synthesize_returns_audio(monkeypatch: pytest.MonkeyPatch) -> None:
     """火山 /api/v1/tts 返回 JSON，音频在 data 字段的 base64 里。"""
     audio = b"ID3-audio-bytes"
-    client = FakeClient(
-        FakeResponse(200, {"code": 3000, "data": base64.b64encode(audio).decode()})
-    )
+    client = FakeClient(FakeResponse(200, {"code": 3000, "data": base64.b64encode(audio).decode()}))
     monkeypatch.setattr("app.infra.voice.volcengine.httpx.AsyncClient", lambda **kwargs: client)
     speech = await VolcengineVoiceProvider().synthesize(
         credential(), "你好", "BV700_streaming", {"speed": 1.5}

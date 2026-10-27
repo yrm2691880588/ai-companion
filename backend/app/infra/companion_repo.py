@@ -252,4 +252,3 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )
-

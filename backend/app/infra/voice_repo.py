@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict
 from datetime import UTC, datetime
 
@@ -13,6 +14,8 @@ from app.domain.voice import VoiceSetting, VoiceUsageRecord
 from app.infra.voice.base import VoiceCredential, VoiceOption
 from app.models.voice import VoiceProviderSettingRow, VoiceUsageRow, VoiceVoiceRow
 from app.security.crypto import SecretBox
+
+_LOG = logging.getLogger(__name__)
 
 
 class SqlVoiceSettingsRepository:
@@ -28,6 +31,8 @@ class SqlVoiceSettingsRepository:
         try:
             data = json.loads(self._box.decrypt(cipher))
         except Exception:
+            # 密钥轮换或密文损坏：不阻断服务，但必须留痕，否则用户只看到"未配置"
+            _LOG.warning("语音凭据解密失败，按未配置处理", exc_info=True)
             return VoiceCredential()
         return VoiceCredential(
             app_id=str(data.get("app_id", "")),

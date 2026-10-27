@@ -12,7 +12,8 @@ function check(name, ok, detail = "") {
 }
 
 const browser = await chromium.launch({
-  channel: "chrome",
+  // 本地用真实 Chrome；CI 里没有 Chrome，用 Playwright 自带 Chromium
+  ...(process.env.PW_CHANNEL === "none" ? {} : { channel: process.env.PW_CHANNEL || "chrome" }),
   headless: true,
   args: ["--no-sandbox"],
 });

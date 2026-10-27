@@ -9,6 +9,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.ids import new_ulid
 from app.models.chat import SessionSummary
 
 
@@ -18,6 +19,7 @@ class SummaryRecord:
     summary: str
     covered_seq: int
     updated_at: datetime
+    ulid: str = ""
 
 
 class SummaryRepository(Protocol):
@@ -39,6 +41,7 @@ class InMemorySummaryRepository:
             summary=summary,
             covered_seq=covered_seq,
             updated_at=datetime.now(UTC),
+            ulid=new_ulid(),
         )
         self._items[session_id] = record
         return record
@@ -83,4 +86,5 @@ def _to_record(row: SessionSummary) -> SummaryRecord:
         summary=row.summary,
         covered_seq=row.covered_seq,
         updated_at=row.updated_at,
+        ulid=row.ulid,
     )

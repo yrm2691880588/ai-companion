@@ -40,7 +40,6 @@ export async function startRecording(options: RecorderOptions = {}): Promise<Rec
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: Blob[] = [];
   const startedAt = Date.now();
-  let timer: number | undefined;
   let meter: number | undefined;
   let closed = false;
 
@@ -53,7 +52,7 @@ export async function startRecording(options: RecorderOptions = {}): Promise<Rec
   const stopAll = () => {
     if (closed) return;
     closed = true;
-    if (timer !== undefined) window.clearInterval(timer);
+    window.clearInterval(timer);
     if (meter !== undefined) window.clearInterval(meter);
     stream.getTracks().forEach((track) => track.stop());
     void audioContext.close();
@@ -76,7 +75,7 @@ export async function startRecording(options: RecorderOptions = {}): Promise<Rec
   }
 
   const maxMs = options.maxMs ?? MAX_RECORD_MS;
-  timer = window.setInterval(() => {
+  const timer = window.setInterval(() => {
     if (Date.now() - startedAt >= maxMs) {
       options.onTimeout?.();
     }
@@ -138,3 +137,4 @@ export function formatDuration(ms: number): string {
   const seconds = total % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+

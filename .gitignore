@@ -36,3 +36,7 @@ pip-*/
 backend/pytest-of-*/
 pytest-of-*/
 
+
+# pip 安装产生的元数据目录
+*.egg-info/
+

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -18,6 +19,8 @@ from app.infra.voice.base import (
 )
 from app.infra.voice.registry import VoiceProviderRegistry
 from app.security.crypto import SecretBox
+
+_LOG = logging.getLogger(__name__)
 
 VOICE_CACHE_HOURS = 24
 
@@ -274,6 +277,7 @@ class VoiceService:
         try:
             data = json.loads(self._box.decrypt(cipher))
         except Exception:
+            _LOG.warning("语音凭据解密失败", exc_info=True)
             return VoiceCredential()
         return VoiceCredential(
             app_id=str(data.get("app_id", "")),

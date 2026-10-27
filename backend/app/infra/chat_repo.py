@@ -334,6 +334,3 @@ def _to_message(row: ChatMessage) -> MessageRecord:
         created_at=row.created_at,
         client_request_id=row.client_request_id,
     )
-
-
-

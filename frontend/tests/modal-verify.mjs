@@ -69,3 +69,4 @@ const failed = results.filter((item) => !item.ok).length;
 console.log(`\n共 ${results.length} 项，失败 ${failed} 项`);
 if (failed > 0) process.exit(1);
 
+

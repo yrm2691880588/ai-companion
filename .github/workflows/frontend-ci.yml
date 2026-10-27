@@ -1,0 +1,69 @@
+name: frontend-ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 代码检查
+        run: pnpm lint
+      - name: 类型检查与构建
+        run: pnpm build
+      - name: 纯逻辑单测
+        run: pnpm test
+
+  page-check:
+    runs-on: ubuntu-latest
+    needs: build
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 安装 Playwright 浏览器
+        run: npx playwright install --with-deps chromium
+      - name: 启动后端
+        working-directory: .
+        run: |
+          python3 -m venv backend/.venv
+          backend/.venv/bin/pip install -e "backend[dev]"
+          cd backend
+          .venv/bin/alembic upgrade head
+          .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/healthz > /dev/null; then break; fi
+            sleep 1
+          done
+      - name: 页面验收
+        env:
+          PW_CHANNEL: none
+        run: pnpm test:page
+

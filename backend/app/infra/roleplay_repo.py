@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.ids import new_ulid
 from app.domain.roleplay import RunRecord, Scenario
 from app.models.roleplay import RoleplayRun, RoleplayScenario, SafetyEvent
 
@@ -67,6 +68,8 @@ class SqlRunRepository:
     ) -> RunRecord:
         async with self._session_factory() as session:
             row = RoleplayRun(
+                ulid=new_ulid(),
+                origin_device_id="local",
                 user_id=user_id,
                 companion_id=companion_id,
                 scenario_key=scenario_key,
@@ -158,6 +161,7 @@ def _to_scenario(row: RoleplayScenario) -> Scenario:
 def _to_run(row: RoleplayRun) -> RunRecord:
     return RunRecord(
         id=row.id,
+        ulid=row.ulid,
         user_id=row.user_id,
         companion_id=row.companion_id,
         scenario_key=row.scenario_key,

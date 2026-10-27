@@ -8,7 +8,7 @@ function check(name, ok, detail = "") {
 }
 
 const browser = await chromium.launch({
-  channel: "chrome",
+  ...(process.env.PW_CHANNEL === "none" ? {} : { channel: process.env.PW_CHANNEL || "chrome" }),
   headless: true,
   args: ["--no-sandbox", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
 });
@@ -57,3 +57,4 @@ await browser.close();
 const failed = results.filter((item) => !item.ok).length;
 console.log(`\n共 ${results.length} 项，失败 ${failed} 项`);
 if (failed > 0) process.exit(1);
+
