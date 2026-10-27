@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -271,6 +272,15 @@ def create_app(
         await engine.dispose()
 
     app = FastAPI(title="AI 伴侣系统 API", version="0.1.0", lifespan=lifespan)
+    # 跨端访问：手机/PWA 直连本机后端时需要 CORS；默认只允许同源
+    if resolved.cors_origin_list:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=resolved.cors_origin_list,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     app.state.settings = resolved
     app.state.registry = registry
     app.state.provider_settings_service = provider_settings_service

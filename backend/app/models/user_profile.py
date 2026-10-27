@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import new_ulid
 from app.models.base import Base, utcnow
 
 
@@ -16,6 +17,8 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ulid: Mapped[str] = mapped_column(String(26), default=new_ulid)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64))
     user_id: Mapped[str] = mapped_column(String(64), unique=True)
     nickname: Mapped[str] = mapped_column(String(20), default="")
     identity: Mapped[str] = mapped_column(String(60), default="")
@@ -38,6 +41,8 @@ class CompanionUserProfile(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ulid: Mapped[str] = mapped_column(String(26), default=new_ulid)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64))
     user_id: Mapped[str] = mapped_column(String(64))
     companion_id: Mapped[int] = mapped_column(ForeignKey("companions.id", ondelete="CASCADE"))
     nickname: Mapped[str | None] = mapped_column(String(20))

@@ -120,6 +120,7 @@ class SqlMemoryRepository:
 def _to_record(row: Memory) -> MemoryRecord:
     return MemoryRecord(
         id=row.id,
+        ulid=row.ulid,
         user_id=row.user_id,
         companion_id=row.companion_id,
         type=row.type,
@@ -132,3 +133,4 @@ def _to_record(row: Memory) -> MemoryRecord:
         created_at=row.created_at,
         last_used_at=row.last_used_at,
     )
+

@@ -45,6 +45,7 @@ class CompanionRecord:
     voice_params: dict[str, Any] | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    ulid: str = ""
 
 
 @dataclass(slots=True)
@@ -494,3 +495,6 @@ class CompanionService:
                 status_code=502,
             ) from exc
         return data["value"], result
+
+
+

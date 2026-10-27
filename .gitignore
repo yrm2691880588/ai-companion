@@ -31,3 +31,8 @@ backend/pip-*/
 backend/tmps*/
 pip-*/
 
+
+# pytest 临时目录（跑测试会自动生成）
+backend/pytest-of-*/
+pytest-of-*/
+

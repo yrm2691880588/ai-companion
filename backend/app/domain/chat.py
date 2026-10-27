@@ -83,6 +83,7 @@ class SessionRecord:
     state: str = "active"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_message_at: datetime | None = None
+    ulid: str = ""
 
 
 @dataclass(slots=True)
@@ -94,6 +95,7 @@ class MessageRecord:
     content: str
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     client_request_id: str | None = None
+    ulid: str = ""
 
 
 class ChatRepository(Protocol):
@@ -724,3 +726,8 @@ class ChatService:
             usage=aggregate_usage(usage_parts),
             memories=recalled,
         )
+
+
+
+
+

@@ -66,6 +66,7 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=True,
                 avatar=companion.avatar,
+                ulid=companion.ulid,
                 derived_from=companion.derived_from,
                 voice_id=companion.voice_id,
                 voice_params=companion.voice_params,
@@ -149,6 +150,7 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=companion.memory_enabled,
                 avatar=companion.avatar,
+                ulid=companion.ulid,
                 derived_from=companion.derived_from,
                 voice_id=companion.voice_id,
                 voice_params=companion.voice_params,
@@ -243,9 +245,11 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         compiled_prompt=persona_row.compiled_prompt,
         memory_enabled=companion.memory_enabled,
         avatar=companion.avatar,
+        ulid=companion.ulid,
         derived_from=companion.derived_from,
         voice_id=companion.voice_id,
         voice_params=companion.voice_params,
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )
+

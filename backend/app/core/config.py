@@ -57,8 +57,17 @@ class Settings(BaseSettings):
     local_user_id: str = "local-user"
     # 语音音频临时目录；留空则用系统临时目录
     audio_dir: str = ""
+    # 允许跨端访问的来源（逗号分隔）；留空=只允许同源访问
+    # 手机端/PWA 直连本机后端时需要填实际来源，例如 http://192.168.1.10:8000
+    cors_origins: str = ""
+    # 是否监听局域网（true=0.0.0.0，手机可访问；false=仅本机）
+    listen_lan: bool = False
     # 前端构建产物目录；留空则用仓库下的 frontend/dist
     frontend_dist: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     @property
     def admin_phone_set(self) -> set[str]:
