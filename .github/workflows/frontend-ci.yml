@@ -31,6 +31,19 @@ jobs:
       - name: 纯逻辑单测
         run: pnpm test
 
+      - name: 安装 Python（用于生成物漂移检查）
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v3
+      - name: 安装后端依赖
+        working-directory: backend
+        run: uv sync --frozen --extra dev
+      - name: 检查表单契约生成物是否漂移
+        working-directory: backend
+        run: uv run python ../scripts/generate_form_contracts.py --check
+
   # 门槛二：真实页面验收。需要 Postgres 与一份可用的伴侣数据。
   page-check:
     runs-on: ubuntu-latest
@@ -107,8 +120,18 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: 页面验收
+      - name: 页面验收（主流程）
         working-directory: frontend
         env:
           PW_CHANNEL: none
         run: pnpm test:page
+
+      - name: 页面验收（专项）
+        working-directory: frontend
+        env:
+          PW_CHANNEL: none
+        run: |
+          node tests/query-verify.mjs
+          node tests/voice-verify.mjs
+          node tests/modal-verify.mjs
+          node tests/menu-verify.mjs
