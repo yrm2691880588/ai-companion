@@ -163,18 +163,19 @@ await avatar.click();
 const chooser = await chooserPromise;
 await chooser.setFiles({ name: "avatar.png", mimeType: "image/png", buffer: png });
 await page.waitForTimeout(1000);
-const cropper = page.locator(".avatar-canvas");
+const cropper = page.locator(".reactEasyCrop_Container");
 check("裁剪弹窗打开", (await cropper.count()) > 0);
 if ((await cropper.count()) > 0) {
   check("缩放滑杆存在", (await page.locator('.modal input[type="range"]').count()) > 0);
   check("保存/取消按钮存在", (await page.getByRole("button", { name: "保存头像" }).count()) > 0);
 
   // 滚轮放大：标签应从 1.0× 变为更大
-  const beforeZoom = await page.locator(".modal .muted").last().innerText();
+  const zoomLabel = page.locator(".modal label.muted").first();
+  const beforeZoom = await zoomLabel.innerText();
   await cropper.hover();
   await page.mouse.wheel(0, -600);
-  await page.waitForTimeout(300);
-  const afterZoom = await page.locator(".modal .muted").last().innerText();
+  await page.waitForTimeout(500);
+  const afterZoom = await zoomLabel.innerText();
   check("滚轮可放大", beforeZoom !== afterZoom, `${beforeZoom} → ${afterZoom}`);
 
   // 放大后拖动：不应报错，画布仍存在
@@ -190,7 +191,7 @@ if ((await cropper.count()) > 0) {
   await page.screenshot({ path: "tmp/verify-cropper.png", fullPage: true });
   await page.getByRole("button", { name: "取消" }).click();
   await page.waitForTimeout(300);
-  check("取消后弹窗关闭", (await page.locator(".avatar-canvas").count()) === 0);
+  check("取消后弹窗关闭", (await page.locator(".reactEasyCrop_Container").count()) === 0);
 }
 
 if (derivedToCleanup) {
@@ -223,6 +224,7 @@ const failed = results.filter((item) => !item.ok);
 writeFileSync("tmp/page-verify-report.json", JSON.stringify(results, null, 2));
 console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
 if (failed.length > 0) process.exit(1);
+
 
 
 

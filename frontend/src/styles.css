@@ -730,20 +730,21 @@ label {
 }
 
 /* ---------- 头像裁剪 ---------- */
-.avatar-canvas {
+.avatar-crop-box {
+  position: relative;
   width: 256px;
   height: 256px;
-  border-radius: 50%;
-  display: block;
   margin: 12px auto;
+  border-radius: 50%;
+  overflow: hidden;
   background: var(--panel-2);
   border: 1px solid var(--line);
-  cursor: grab;
-  touch-action: none;
 }
 
-.avatar-canvas:active {
-  cursor: grabbing;
+/* 让 react-easy-crop 的圆形遮罩与主题色一致 */
+.avatar-crop-box .reactEasyCrop_CropArea {
+  border: 2px solid var(--accent);
+  color: rgba(0, 0, 0, 0.42);
 }
 
 /* ---------- 管理员参数表单 ---------- */
@@ -1026,3 +1027,4 @@ label {
   gap: 8px;
   align-items: center;
 }
+
