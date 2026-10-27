@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     # 本地单用户模式（开源默认）：没有账号、没有管理员
     local_mode: bool = True
     local_user_id: str = "local-user"
+    # 语音音频临时目录；留空则用系统临时目录
+    audio_dir: str = ""
     # 前端构建产物目录；留空则用仓库下的 frontend/dist
     frontend_dist: str = ""
 

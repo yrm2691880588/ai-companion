@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from app.api.v1.templates import router as templates_router
 from app.api.v1.trial import router as trial_router
 from app.api.v1.usage import router as usage_router
 from app.api.v1.user_profile import router as user_profile_router
+from app.api.v1.voice import router as voice_router
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
 from app.domain.auth import AuthRepository, AuthService
@@ -56,7 +58,14 @@ from app.domain.templates import TEMPLATES, TemplateRepository
 from app.domain.trial import TrialService
 from app.domain.usage import UsageRepository
 from app.domain.user_profile import InMemoryUserProfileRepository, UserProfileService
+from app.domain.voice import (
+    InMemoryVoiceSettingsRepository,
+    InMemoryVoiceUsageRepository,
+    InMemoryVoiceVoiceRepository,
+    VoiceService,
+)
 from app.infra.analytics_repo import InMemoryAnalyticsRepository, SqlAnalyticsRepository
+from app.infra.audio_store import AudioStore
 from app.infra.auth_repo import SqlAuthRepository
 from app.infra.chat_repo import SqlChatRepository
 from app.infra.companion_repo import SqlCompanionRepository
@@ -75,6 +84,12 @@ from app.infra.system_settings_repo import SqlSystemSettingsRepository
 from app.infra.template_repo import SqlTemplateRepository
 from app.infra.usage_repo import SqlUsageRepository
 from app.infra.user_profile_repo import SqlUserProfileRepository
+from app.infra.voice.registry import VoiceProviderRegistry
+from app.infra.voice_repo import (
+    SqlVoiceSettingsRepository,
+    SqlVoiceUsageRepository,
+    SqlVoiceVoiceRepository,
+)
 from app.security.crypto import SecretBox
 
 _LOG = logging.getLogger(__name__)
@@ -153,6 +168,29 @@ def create_app(
         if resolved.env == "test"
         else SqlCustomModelRepository(session_factory)
     )
+    box = _secret_box(resolved)
+    voice_registry = VoiceProviderRegistry()
+    if resolved.env == "test":
+        voice_settings_store = InMemoryVoiceSettingsRepository()
+        voice_voices_store = InMemoryVoiceVoiceRepository()
+        voice_usage_store = InMemoryVoiceUsageRepository()
+    else:
+        voice_settings_store = SqlVoiceSettingsRepository(session_factory, box)
+        voice_voices_store = SqlVoiceVoiceRepository(session_factory)
+        voice_usage_store = SqlVoiceUsageRepository(session_factory)
+    voice_service = VoiceService(
+        voice_registry,
+        voice_settings_store,
+        voice_voices_store,
+        voice_usage_store,
+        box=box,
+    )
+    audio_root = (
+        Path(resolved.audio_dir)
+        if getattr(resolved, "audio_dir", "")
+        else Path(tempfile.gettempdir()) / "ai-companion-audio"
+    )
+    audio_store = AudioStore(audio_root)
     system_settings = SystemSettingsService(settings_store)
     quota_enforced, quota_limit = system_settings.quota_config()
     quota_service = QuotaService(quotas_store, daily_limit=quota_limit, enforced=quota_enforced)
@@ -237,6 +275,8 @@ def create_app(
     app.state.registry = registry
     app.state.provider_settings_service = provider_settings_service
     app.state.custom_model_repo = custom_model_repo
+    app.state.voice_service = voice_service
+    app.state.audio_store = audio_store
 
     async def apply_provider_settings() -> None:
         """把库里的供应商 Key/URL 合并进注册表，并让路由使用新注册表。"""
@@ -310,6 +350,7 @@ def create_app(
     app.include_router(trial_router)
     app.include_router(analytics_router)
     app.include_router(user_profile_router)
+    app.include_router(voice_router)
     app.include_router(roleplay_router)
     app.include_router(quota_router)
     app.include_router(auth_router)
