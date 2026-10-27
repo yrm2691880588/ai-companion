@@ -138,7 +138,7 @@ await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "更多" }).first().click();
 check(
   "伴侣菜单有导出人设",
-  (await page.getByRole("button", { name: "导出人设" }).count()) > 0,
+  (await page.getByRole("menuitem", { name: "导出人设" }).count()) > 0,
 );
 
 // 埋点：打开页面应产生 app_open
@@ -224,6 +224,7 @@ const failed = results.filter((item) => !item.ok);
 writeFileSync("tmp/page-verify-report.json", JSON.stringify(results, null, 2));
 console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
 if (failed.length > 0) process.exit(1);
+
 
 
 

@@ -16,7 +16,7 @@ page.on("pageerror", (error) => errors.push(error.message));
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "更多" }).first().click();
 await page.waitForTimeout(300);
-await page.getByRole("button", { name: "删除" }).first().click();
+await page.getByRole("menuitem", { name: "删除" }).first().click();
 await page.waitForTimeout(500);
 
 const dialog = page.getByRole("dialog");
@@ -68,3 +68,4 @@ await browser.close();
 const failed = results.filter((item) => !item.ok).length;
 console.log(`\n共 ${results.length} 项，失败 ${failed} 项`);
 if (failed > 0) process.exit(1);
+

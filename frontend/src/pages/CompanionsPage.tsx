@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
+import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import { downloadPersona } from "../components/PersonaImport";
 import type { Companion, Latest } from "../types";
@@ -47,6 +48,7 @@ export default function CompanionsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [menuId, setMenuId] = useState<number | null>(null);
+  const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState<Companion | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -221,28 +223,54 @@ export default function CompanionsPage() {
                   <Link className="btn primary" to={`/companions/${item.id}/chat`}>
                     {latest?.content ? "继续聊" : "开始聊天"}
                   </Link>
-                  <button
-                    className="btn ghost"
-                    onClick={() => setMenuId(menuId === item.id ? null : item.id)}
-                  >
-                    更多
-                  </button>
-                  {menuId === item.id && (
-                    <div className="menu">
-                      <Link to={`/companions/${item.id}/persona`}>人设</Link>
-                      <button className="link" onClick={() => downloadPersona(item)}>导出人设</button>
-                      <Link to={`/companions/${item.id}/memories`}>记忆</Link>
-                      <Link to={`/companions/${item.id}/roleplay`}>演练</Link>
-                      {item.avatar && (
-                        <button className="link" onClick={() => void clearAvatar(item)}>
-                          清除头像
-                        </button>
-                      )}
-                      <button className="link danger-text" onClick={() => askDelete(item)}>
-                        删除
+                  <Menu
+                    triggerLabel={`${item.name} 的更多操作`}
+                    open={menuId === item.id}
+                    onOpenChange={(open) => setMenuId(open ? item.id : null)}
+                    trigger={
+                      <button className="btn ghost" onClick={() => setMenuId(item.id)}>
+                        更多
                       </button>
-                    </div>
-                  )}
+                    }
+                    items={[
+                      {
+                        key: "persona",
+                        label: "人设",
+                        onSelect: () => navigate(`/companions/${item.id}/persona`),
+                      },
+                      {
+                        key: "export",
+                        label: "导出人设",
+                        onSelect: () => downloadPersona(item),
+                      },
+                      {
+                        key: "memories",
+                        label: "记忆",
+                        onSelect: () => navigate(`/companions/${item.id}/memories`),
+                      },
+                      {
+                        key: "roleplay",
+                        label: "演练",
+                        onSelect: () => navigate(`/companions/${item.id}/roleplay`),
+                      },
+                      ...(item.avatar
+                        ? [
+                            {
+                              key: "clear-avatar",
+                              label: "清除头像",
+                              onSelect: () => void clearAvatar(item),
+                            },
+                          ]
+                        : []),
+                      {
+                        key: "delete",
+                        label: "删除",
+                        danger: true,
+                        opensModal: true,
+                        onSelect: () => askDelete(item),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             );
@@ -300,6 +328,8 @@ export default function CompanionsPage() {
     </div>
   );
 }
+
+
 
 
 

@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
 import { track } from "../analytics";
+import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import VoiceBar from "../components/VoiceBar";
 import { playAudio } from "../voice";
@@ -65,6 +66,7 @@ export default function ChatPage() {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [recap, setRecap] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
+  const navigate = useNavigate();
   const [echo, setEcho] = useState<{ messageId: number; items: string[] } | null>(null);
   const [echoOpen, setEchoOpen] = useState(false);
   const trackedReplyRef = useRef(false);
@@ -396,27 +398,32 @@ export default function ChatPage() {
             </p>
           </div>
         </div>
-        <div className="toolbar" style={{ position: "relative" }}>
+        <div className="toolbar">
           <Link className="btn ghost" to={`/companions/${companionId}/persona`}>
             人设
           </Link>
-          <button
-            className="btn ghost"
-            aria-label="更多操作"
-            onClick={() => setHeaderMenu(!headerMenu)}
-          >
-            ⋯
-          </button>
-          {headerMenu && (
-            <div className="menu header-menu">
-              <Link to={`/companions/${companionId}/memories`} onClick={() => setHeaderMenu(false)}>
-                她记得的事
-              </Link>
-              <Link to={`/companions/${companionId}/roleplay`} onClick={() => setHeaderMenu(false)}>
-                场景演练
-              </Link>
-            </div>
-          )}
+          <Menu
+            triggerLabel="更多操作"
+            open={headerMenu}
+            onOpenChange={setHeaderMenu}
+            trigger={
+              <button className="btn ghost" aria-label="更多操作">
+                ⋯
+              </button>
+            }
+            items={[
+              {
+                key: "memories",
+                label: "她记得的事",
+                onSelect: () => navigate(`/companions/${companionId}/memories`),
+              },
+              {
+                key: "roleplay",
+                label: "场景演练",
+                onSelect: () => navigate(`/companions/${companionId}/roleplay`),
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -682,6 +689,7 @@ export default function ChatPage() {
     </div>
   );
 }
+
 
 
 
