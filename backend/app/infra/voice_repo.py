@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
@@ -50,7 +51,7 @@ class SqlVoiceSettingsRepository:
     async def upsert(self, setting: VoiceSetting) -> VoiceSetting:
         cipher = None
         if self._box is not None and setting.credential.configured:
-            payload = json.dumps(setting.credential.__dict__, ensure_ascii=False)
+            payload = json.dumps(asdict(setting.credential), ensure_ascii=False)
             cipher = self._box.encrypt(payload)
         async with self._session_factory() as session:
             row = (

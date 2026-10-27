@@ -63,12 +63,20 @@ async def test_missing_credential_rejected() -> None:
     assert "VOICE_NO_CREDENTIAL" in str(excinfo.value)
 
 
-async def test_headers_carry_app_id_and_token() -> None:
+async def test_headers_carry_token() -> None:
     provider = VolcengineVoiceProvider()
     headers = provider._headers(credential())
-    assert headers["X-Api-App-Id"] == "app-1"
     assert "token-1" in headers["Authorization"]
-    assert headers["X-Api-Cluster"] == "volcano_tts"
+    assert headers["Content-Type"] == "application/json"
+
+
+async def test_app_block_carries_credentials() -> None:
+    """火山把凭据放在请求体 app 字段里，不是只放头部。"""
+    provider = VolcengineVoiceProvider()
+    block = provider._app_block(credential(), "volcano_tts")
+    assert block["appid"] == "app-1"
+    assert block["token"] == "token-1"
+    assert block["cluster"] == "volcano_tts"
 
 
 async def test_transcribe_parses_text(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,7 +89,7 @@ async def test_transcribe_parses_text(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert transcript.text == "你好呀"
     assert transcript.duration_ms == 1200
-    assert client.last_url.endswith("/api/v3/asr/sauc/bigmodel/recognize/flash")
+    assert client.last_url.endswith("/api/v1/asr")
 
 
 async def test_transcribe_auth_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -126,17 +134,20 @@ async def test_transcribe_empty_text(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_synthesize_returns_audio(monkeypatch: pytest.MonkeyPatch) -> None:
+    """火山 /api/v1/tts 返回 JSON，音频在 data 字段的 base64 里。"""
     audio = b"ID3-audio-bytes"
-    client = FakeClient(FakeResponse(200, content=audio))
-    client._response.headers = {"content-type": "audio/mpeg"}
+    client = FakeClient(
+        FakeResponse(200, {"code": 3000, "data": base64.b64encode(audio).decode()})
+    )
     monkeypatch.setattr("app.infra.voice.volcengine.httpx.AsyncClient", lambda **kwargs: client)
     speech = await VolcengineVoiceProvider().synthesize(
-        credential(), "你好", "BV700_streaming", {"speed": 10}
+        credential(), "你好", "BV700_streaming", {"speed": 1.5}
     )
     assert speech.audio == audio
     payload = client.last_json
-    assert payload["req_params"]["speaker"] == "BV700_streaming"
-    assert payload["req_params"]["audio_params"]["speech_rate"] == 10
+    assert payload["app"]["appid"] == "app-1"
+    assert payload["audio"]["voice_type"] == "BV700_streaming"
+    assert payload["audio"]["speed_ratio"] == 1.5
 
 
 async def test_synthesize_base64_json(monkeypatch: pytest.MonkeyPatch) -> None:

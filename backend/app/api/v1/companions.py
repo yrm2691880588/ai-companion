@@ -178,4 +178,3 @@ async def set_companion_voice(
 ) -> CompanionOut:
     record = await service.set_voice(user_id, companion_id, payload.voice_id)
     return _out(record)
-

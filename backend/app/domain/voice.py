@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
@@ -266,7 +266,7 @@ class VoiceService:
             raise AppError(
                 code="VOICE_NO_MASTER_KEY", message="缺少主密钥，无法加密保存", status_code=500
             )
-        return self._box.encrypt(json.dumps(setting.credential.__dict__, ensure_ascii=False))
+        return self._box.encrypt(json.dumps(asdict(setting.credential), ensure_ascii=False))
 
     def load_credential(self, cipher: str | None) -> VoiceCredential:
         if not cipher or self._box is None:
