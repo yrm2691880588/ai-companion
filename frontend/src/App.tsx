@@ -1,16 +1,19 @@
+import { lazy, Suspense } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
-import ChatPage from "./pages/ChatPage";
-import CompanionsPage from "./pages/CompanionsPage";
-import CreatePage from "./pages/CreatePage";
-import MePage from "./pages/MePage";
-import MemoryPage from "./pages/MemoryPage";
-import PersonaPage from "./pages/PersonaPage";
-import RoleplayPage from "./pages/RoleplayPage";
-import SettingsPage from "./pages/SettingsPage";
+import { Toaster } from "sonner";
+const ChatPage = lazy(() => import("./pages/ChatPage"));
+const CompanionsPage = lazy(() => import("./pages/CompanionsPage"));
+const CreatePage = lazy(() => import("./pages/CreatePage"));
+const MePage = lazy(() => import("./pages/MePage"));
+const MemoryPage = lazy(() => import("./pages/MemoryPage"));
+const PersonaPage = lazy(() => import("./pages/PersonaPage"));
+const RoleplayPage = lazy(() => import("./pages/RoleplayPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 export default function App() {
   return (
     <div className="app">
+      <Toaster position="top-center" visibleToasts={3} duration={3000} />
       <header className="topbar">
         <Link to="/" className="brand">
           AI 伴侣
@@ -24,6 +27,7 @@ export default function App() {
         </nav>
       </header>
       <main className="main">
+        <Suspense fallback={<p className="muted">加载中…</p>}>
         <Routes>
           <Route path="/" element={<CompanionsPage />} />
           <Route path="/create" element={<CreatePage />} />
@@ -35,6 +39,7 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<p className="muted">页面不存在</p>} />
         </Routes>
+        </Suspense>
       </main>
     </div>
   );

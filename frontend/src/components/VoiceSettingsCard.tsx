@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
+import type { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { voiceSchema } from "../lib/forms";
+import FieldError from "./FieldError";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../api";
-import type { VoiceProvider } from "../lib/types";
 
 const GUIDE_STEPS = [
   {
@@ -26,31 +33,19 @@ const GUIDE_STEPS = [
 ];
 
 export default function VoiceSettingsCard() {
-  const [providers, setProviders] = useState<VoiceProvider[]>([]);
-  const [appId, setAppId] = useState("");
-  const [token, setToken] = useState("");
-  const [cluster, setCluster] = useState("");
+  const client = useQueryClient();
+  const providersQuery = useQuery(queries.voiceProviders());
+  const providers = providersQuery.data ?? [];
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<z.infer<typeof voiceSchema>>({
+    resolver: zodResolver(voiceSchema),
+    values: { appId: providers.find(item => item.key === "volcengine")?.app_id ?? "", token: "", cluster: "" },
+    resetOptions: { keepDirtyValues: true }, mode: "onBlur",
+  });
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showGuide, setShowGuide] = useState(false);
 
-  async function reload() {
-    try {
-      const list = await api.voiceProviders();
-      setProviders(list);
-      const volc = list.find((item) => item.key === "volcengine");
-      if (volc?.app_id) setAppId(volc.app_id);
-    } catch (event) {
-      setError((event as Error).message);
-    }
-  }
-
-  useEffect(() => {
-    void reload();
-  }, []);
-
-  async function save() {
+  async function save({ appId, token, cluster }: z.infer<typeof voiceSchema>) {
     setBusy(true);
     setError("");
     try {
@@ -59,10 +54,10 @@ export default function VoiceSettingsCard() {
         token: token.trim() || undefined,
         cluster: cluster.trim() || undefined,
       });
-      await reload();
-      setToken("");
-      setMessage("已保存，可以点「测试连接」验证");
-      window.setTimeout(() => setMessage(""), 2500);
+      await client.invalidateQueries({ queryKey: queries.voiceProviders().queryKey });
+      await client.invalidateQueries({ queryKey: queries.voices("volcengine").queryKey });
+      setValue("token", "");
+      toast.success("已保存，可以点「测试连接」验证", { id: "voice-saved" });
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -75,9 +70,11 @@ export default function VoiceSettingsCard() {
     setError("");
     try {
       const result = await api.probeVoiceProvider("volcengine");
-      setMessage(
-        result.ok ? `连接成功，拿到 ${result.voice_count ?? 0} 个音色` : "连接失败，检查 AppID 与 Token",
-      );
+      if (result.ok) {
+        toast.success(`连接成功，拿到 ${result.voice_count ?? 0} 个音色`, { id: "voice-probe" });
+      } else {
+        toast.error("连接失败，检查 AppID 与 Token", { id: "voice-probe" });
+      }
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -88,14 +85,13 @@ export default function VoiceSettingsCard() {
   const volc = providers.find((item) => item.key === "volcengine");
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <form className="card" style={{ marginTop: 12 }} noValidate onSubmit={handleSubmit(save)}>
       <h2>语音</h2>
       <p className="muted">
         语音对话需要单独的供应商：你说话它识别成文字，她回复时合成语音。Key 只存在本机，加密保存。
       </p>
 
-      {error && <div className="alert">{error}</div>}
-      {message && <div className="notice">{message}</div>}
+      {(error || providersQuery.error) && <div className="alert">{error || providersQuery.error?.message}</div>}
 
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <h3>火山引擎（豆包语音）</h3>
@@ -107,40 +103,40 @@ export default function VoiceSettingsCard() {
           <label htmlFor="voice-appid">AppID</label>
           <input
             id="voice-appid"
-            value={appId}
+            {...register("appId")} aria-invalid={!!errors.appId} aria-describedby="voice-appId-error"
             placeholder="控制台里的 AppID"
-            onChange={(event) => setAppId(event.target.value)}
           />
+          <FieldError id="voice-appId-error" error={errors.appId} />
         </div>
         <div>
           <label htmlFor="voice-token">Access Token</label>
           <input
             id="voice-token"
             type="password"
-            value={token}
+            {...register("token")} aria-invalid={!!errors.token} aria-describedby="voice-token-error"
             placeholder={volc?.configured ? "留空则不修改" : "控制台里的 Access Token"}
-            onChange={(event) => setToken(event.target.value)}
           />
+          <FieldError id="voice-token-error" error={errors.token} />
         </div>
         <div>
           <label htmlFor="voice-cluster">Cluster（可选）</label>
           <input
             id="voice-cluster"
-            value={cluster}
+            {...register("cluster")} aria-invalid={!!errors.cluster} aria-describedby="voice-cluster-error"
             placeholder="例如 volcano_tts"
-            onChange={(event) => setCluster(event.target.value)}
           />
+          <FieldError id="voice-cluster-error" error={errors.cluster} />
         </div>
       </div>
 
       <div className="toolbar">
-        <button className="primary" disabled={busy} onClick={() => void save()}>
+        <button type="submit" className="primary" disabled={busy || providersQuery.isPending || providersQuery.isError}>
           {busy ? "保存中…" : "保存"}
         </button>
-        <button className="ghost" disabled={busy || !volc?.configured} onClick={() => void probe()}>
+        <button type="button" className="ghost" disabled={busy || !volc?.configured} onClick={() => void probe()}>
           测试连接
         </button>
-        <button className="ghost" onClick={() => setShowGuide(!showGuide)}>
+        <button type="button" className="ghost" onClick={() => setShowGuide(!showGuide)}>
           {showGuide ? "收起教程" : "怎么拿到 AppID 和 Token？"}
         </button>
         <a
@@ -168,7 +164,7 @@ export default function VoiceSettingsCard() {
           </p>
         </div>
       )}
-    </div>
+    </form>
   );
 }
 

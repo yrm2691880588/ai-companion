@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
-import type { Companion, Memory } from "../lib/types";
+import type { Memory } from "../lib/types";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -15,38 +17,24 @@ function relativeTime(iso: string): string {
 export default function MemoryPage() {
   const { id } = useParams();
   const companionId = Number(id);
-  const [companion, setCompanion] = useState<Companion | null>(null);
-  const [items, setItems] = useState<Memory[]>([]);
+  const client = useQueryClient();
+  const companionQuery = useQuery(queries.companion(companionId));
+  const memoriesQuery = useQuery(queries.memories(companionId));
+  const companion = companionQuery.data;
+  const items = memoriesQuery.data ?? [];
+  const enabled = companion?.memory_enabled ?? true;
+  const loading = companionQuery.isPending || memoriesQuery.isPending;
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [enabled, setEnabled] = useState(true);
-
-  async function reload() {
-    try {
-      const [loaded, memories] = await Promise.all([
-        api.companion(companionId),
-        api.memories(companionId),
-      ]);
-      setCompanion(loaded);
-      setEnabled(loaded.memory_enabled);
-      setItems(memories);
-    } catch (event) {
-      setError((event as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companionId]);
+  const loadError = companionQuery.error?.message || memoriesQuery.error?.message;
+  const toggleMutation = useMutation({
+    mutationFn: (next: boolean) => api.memoryEnabled(companionId, next),
+    onSuccess: (_data, next) => client.setQueryData(queries.companion(companionId).queryKey, old => old ? { ...old, memory_enabled: next } : old),
+  });
 
   async function toggle() {
     try {
       const next = !enabled;
-      await api.memoryEnabled(companionId, next);
-      setEnabled(next);
+      await toggleMutation.mutateAsync(next);
     } catch (event) {
       setError((event as Error).message);
     }
@@ -56,7 +44,7 @@ export default function MemoryPage() {
     if (!window.confirm(`删除这条记忆？\n\n[${memory.type_label}] ${memory.content}`)) return;
     try {
       await api.deleteMemory(memory.id);
-      setItems((prev) => prev.filter((item) => item.id !== memory.id));
+      client.setQueryData(queries.memories(companionId).queryKey, old => old?.filter(item => item.id !== memory.id));
     } catch (event) {
       setError((event as Error).message);
     }
@@ -78,13 +66,13 @@ export default function MemoryPage() {
           <Link className="btn ghost" to={`/companions/${companionId}/chat`}>
             回到对话
           </Link>
-          <button className={enabled ? "ghost" : "primary"} onClick={() => void toggle()}>
+          <button disabled={!companion || toggleMutation.isPending} className={enabled ? "ghost" : "primary"} onClick={() => void toggle()}>
             {enabled ? "关闭记忆" : "开启记忆"}
           </button>
         </div>
       </div>
 
-      {error && <div className="alert">{error}</div>}
+      {(error || loadError) && <div className="alert">{error || loadError}</div>}
       {!enabled && (
         <div className="notice">
           记忆已关闭：不会自动抽取新记忆，也不会在对话里调用已有记忆；已经记住的内容仍然保留。
@@ -93,7 +81,7 @@ export default function MemoryPage() {
 
       {loading ? (
         <p className="muted">加载中…</p>
-      ) : items.length === 0 ? (
+      ) : loadError ? null : items.length === 0 ? (
         <div className="card">
           <h3>还没有记忆</h3>
           <p className="muted">聊天时提到自己的喜好、经历、习惯或约定，伴侣会自动记下来。</p>

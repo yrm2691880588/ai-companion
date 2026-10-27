@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
@@ -6,7 +8,7 @@ import AvatarCropper from "../components/AvatarCropper";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import { downloadPersona } from "../components/PersonaImport";
-import type { Companion, Latest } from "../lib/types";
+import type { Companion } from "../lib/types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -43,10 +45,14 @@ function relativeTime(iso?: string | null): string {
 }
 
 export default function CompanionsPage() {
-  const [items, setItems] = useState<Companion[]>([]);
-  const [latests, setLatests] = useState<Record<number, Latest>>({});
+  const client = useQueryClient();
+  const listQuery = useQuery(queries.companions());
+  const items = listQuery.data ?? [];
+  const latestQueries = useQueries({ queries: items.map(item => queries.latest(item.id)) });
+  const latests = Object.fromEntries(items.map((item, index) => [item.id, latestQueries[index].data]));
+  const loading = listQuery.isPending;
+  const loadError = listQuery.error?.message || latestQueries.find(query => query.error)?.error?.message;
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [menuId, setMenuId] = useState<number | null>(null);
   const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState<Companion | null>(null);
@@ -57,24 +63,10 @@ export default function CompanionsPage() {
   const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  async function reload() {
-    try {
-      const list = await api.companions();
-      setItems(list);
-      const entries = await Promise.all(
-        list.map(async (item) => [item.id, await api.latest(item.id)] as const),
-      );
-      setLatests(Object.fromEntries(entries));
-    } catch (event) {
-      setError((event as Error).message);
-    } finally {
-      setLoading(false);
-    }
+  function updateCompanion(updated: Companion) {
+    client.setQueryData(queries.companion(updated.id).queryKey, updated);
+    client.setQueryData(queries.companions().queryKey, (old) => old?.map(item => item.id === updated.id ? updated : item));
   }
-
-  useEffect(() => {
-    void reload();
-  }, []);
 
   function askDelete(item: Companion) {
     setMenuId(null);
@@ -110,7 +102,7 @@ export default function CompanionsPage() {
     if (!avatarTarget) return;
     try {
       const updated = await api.setAvatar(avatarTarget, dataUrl);
-      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      updateCompanion(updated);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -122,7 +114,7 @@ export default function CompanionsPage() {
   async function clearAvatar(item: Companion) {
     try {
       const updated = await api.setAvatar(item.id, null);
-      setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      updateCompanion(updated);
       setMenuId(null);
     } catch (err) {
       setError((err as Error).message);
@@ -139,7 +131,9 @@ export default function CompanionsPage() {
     try {
       await api.deleteCompanion(deleteTarget.id, deleteTarget.name);
       setDeleteTarget(null);
-      await reload();
+      client.removeQueries({ queryKey: queries.companion(deleteTarget.id).queryKey });
+      client.removeQueries({ queryKey: queries.latest(deleteTarget.id).queryKey });
+      await client.invalidateQueries({ queryKey: queries.companions().queryKey });
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -159,7 +153,7 @@ export default function CompanionsPage() {
         </Link>
       </div>
 
-      {error && <div className="alert">{error}</div>}
+      {(error || loadError) && <div className="alert">{error || loadError}</div>}
       {loading ? (
         <div className="grid" style={{ marginTop: 16 }}>
           {[0, 1].map((key) => (
@@ -170,7 +164,7 @@ export default function CompanionsPage() {
             </div>
           ))}
         </div>
-      ) : items.length === 0 ? (
+      ) : listQuery.isError ? null : items.length === 0 ? (
         <div className="card empty-card" style={{ marginTop: 16 }}>
           <h3>还没有伴侣</h3>
           <p className="muted">用一句话描述你想要的人，或从 5 类官方模板开始。</p>

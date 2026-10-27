@@ -1,35 +1,27 @@
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import PersonaForm from "../components/PersonaForm";
 import { track } from "../lib/analytics";
 import UserProfileForm from "../components/UserProfileForm";
 import VoicePicker from "../components/VoicePicker";
-import type { Companion, Persona } from "../lib/types";
+import type { Persona } from "../lib/types";
 
 export default function PersonaPage() {
   const { id } = useParams();
   const companionId = Number(id);
   const navigate = useNavigate();
-  const [companion, setCompanion] = useState<Companion | null>(null);
-  const [draft, setDraft] = useState<Persona | null>(null);
+  const client = useQueryClient();
+  const companionQuery = useQuery(queries.companion(companionId));
+  const companion = companionQuery.data;
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    api
-      .companion(companionId)
-      .then((record) => {
-        setCompanion(record);
-        setDraft(record.persona);
-      })
-      .catch((event) => setError((event as Error).message));
-  }, [companionId]);
-
-  async function derive() {
-    if (!draft) return;
+  async function derive(draft: Persona) {
     setBusy(true);
     setError("");
     try {
@@ -43,8 +35,8 @@ export default function PersonaPage() {
     }
   }
 
-  if (!companion || !draft) {
-    return <p className="muted">{error || "加载中…"}</p>;
+  if (!companion) {
+    return <p className="muted">{error || companionQuery.error?.message || "加载中…"}</p>;
   }
 
   return (
@@ -68,7 +60,6 @@ export default function PersonaPage() {
       </div>
 
       {error && <div className="alert">{error}</div>}
-      {notice && <div className="toast">{notice}</div>}
 
       <div className="notice" style={{ marginTop: 12 }}>
         修改后不会覆盖当前伴侣，而是用这版人设创建一个新伴侣；原来的会话、记忆和头像都保持不变。
@@ -76,8 +67,10 @@ export default function PersonaPage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <PersonaForm
-          value={draft}
-          onChange={setDraft}
+          key={`${companionId}-${editing}`}
+          formId="derive-persona"
+          value={companion.persona}
+          onSubmit={derive}
           disabled={!editing || busy}
         />
       </div>
@@ -90,9 +83,8 @@ export default function PersonaPage() {
             void (async () => {
               try {
                 const updated = await api.setCompanionVoice(companionId, voiceId);
-                setCompanion(updated);
-                setNotice("音色已保存，下一条语音生效");
-                window.setTimeout(() => setNotice(""), 2500);
+                client.setQueryData(queries.companion(companionId).queryKey, updated);
+                toast.success("音色已保存，下一条语音生效", { id: "voice-selected" });
               } catch (event) {
                 setError((event as Error).message);
               }
@@ -111,14 +103,13 @@ export default function PersonaPage() {
 
       {editing && (
         <div className="toolbar">
-          <button className="primary" disabled={busy} onClick={() => void derive()}>
+          <button className="primary" disabled={busy} type="submit" form="derive-persona">
             {busy ? "创建中…" : "用这版人设创建新伴侣"}
           </button>
           <button
             className="ghost"
             disabled={busy}
             onClick={() => {
-              setDraft(companion.persona);
               setEditing(false);
             }}
           >

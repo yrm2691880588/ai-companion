@@ -1,59 +1,46 @@
-import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { adminSchema } from "../lib/forms";
+import FieldError from "./FieldError";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../api";
-import type { AdminSettingsResponse, ModelDefaults } from "../lib/types";
+import type { AdminSettingsResponse } from "../lib/types";
 
 export default function AdminSettingsCard() {
-  const [admin, setAdmin] = useState<AdminSettingsResponse | null>(null);
-  const [saved, setSaved] = useState(false);
+  const client = useQueryClient();
+  const adminQuery = useQuery(queries.admin());
+  if (!adminQuery.data) return <p className="muted">{adminQuery.error?.message || "加载管理员设置…"}</p>;
+  return <AdminEditor admin={adminQuery.data} onSaved={saved => client.setQueryData(queries.admin().queryKey, saved)} />;
+}
+
+function AdminEditor({ admin, onSaved }: { admin: AdminSettingsResponse; onSaved: (saved: AdminSettingsResponse) => void }) {
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(adminSchema), values: { model_defaults: admin.settings.model_defaults },
+    resetOptions: { keepDirtyValues: true }, mode: "onBlur",
+  });
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    api
-      .adminSettings()
-      .then(setAdmin)
-      .catch((event) => setError((event as Error).message));
-  }, []);
-
-  function patchTask(task: string, patch: Partial<ModelDefaults>) {
-    setAdmin((prev) => {
-      if (!prev) return prev;
-      const current = prev.settings.model_defaults[task];
-      return {
-        ...prev,
-        settings: {
-          ...prev.settings,
-          model_defaults: {
-            ...prev.settings.model_defaults,
-            [task]: { ...current, ...patch },
-          },
-        },
-      };
-    });
-  }
-
-  async function save() {
-    if (!admin) return;
+  async function save(data: { model_defaults: AdminSettingsResponse["settings"]["model_defaults"] }) {
     setError("");
     try {
-      setAdmin(await api.adminUpdate(admin.settings));
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1500);
+      const saved = await api.adminUpdate({ model_defaults: data.model_defaults });
+      onSaved(saved);
+      reset({ model_defaults: saved.settings.model_defaults });
+      toast.success("已保存", { id: "admin-saved" });
     } catch (event) {
       setError((event as Error).message);
     }
   }
 
-  if (!admin) {
-    return <p className="muted">{error || "加载管理员设置…"}</p>;
-  }
-
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <form className="card" style={{ marginTop: 12 }} onSubmit={handleSubmit(save)}>
       <h2>模型参数</h2>
       <p className="muted">本机统一配置，保存后下一条回复生效。</p>
       {error && <div className="alert">{error}</div>}
       {(["chat_main", "persona_generate"] as const).map((task) => {
-        const item = admin.settings.model_defaults[task];
         const label = task === "chat_main" ? "日常对话" : "人设生成";
         return (
           <div key={task} style={{ marginTop: 14 }}>
@@ -62,8 +49,7 @@ export default function AdminSettingsCard() {
               <label className="admin-field wide">
                 <span>模型</span>
                 <select
-                  value={item.model}
-                  onChange={(event) => patchTask(task, { model: event.target.value })}
+                  {...register(`model_defaults.${task}.model`)}
                 >
                   <option value="">跟随系统路由</option>
                   {admin.models.map((model) => (
@@ -72,6 +58,7 @@ export default function AdminSettingsCard() {
                     </option>
                   ))}
                 </select>
+                <FieldError id={`admin-${task}-model-error`} error={errors.model_defaults?.[task]?.model} />
               </label>
               <label className="admin-field">
                 <span>温度（0–2）</span>
@@ -80,11 +67,9 @@ export default function AdminSettingsCard() {
                   step="0.1"
                   min={0}
                   max={2}
-                  value={item.temperature}
-                  onChange={(event) =>
-                    patchTask(task, { temperature: Number(event.target.value) })
-                  }
+                  {...register(`model_defaults.${task}.temperature`, { valueAsNumber: true })}
                 />
+                <FieldError id={`admin-${task}-temperature-error`} error={errors.model_defaults?.[task]?.temperature} />
               </label>
               <label className="admin-field">
                 <span>top_p（0–1）</span>
@@ -93,9 +78,9 @@ export default function AdminSettingsCard() {
                   step="0.05"
                   min={0}
                   max={1}
-                  value={item.top_p ?? 0.95}
-                  onChange={(event) => patchTask(task, { top_p: Number(event.target.value) })}
+                  {...register(`model_defaults.${task}.top_p`, { valueAsNumber: true })}
                 />
+                <FieldError id={`admin-${task}-top_p-error`} error={errors.model_defaults?.[task]?.top_p} />
               </label>
               <label className="admin-field wide">
                 <span>最大输出（tokens，32–4096）</span>
@@ -103,18 +88,16 @@ export default function AdminSettingsCard() {
                   type="number"
                   min={32}
                   max={4096}
-                  value={item.max_tokens}
-                  onChange={(event) =>
-                    patchTask(task, { max_tokens: Number(event.target.value) })
-                  }
+                  {...register(`model_defaults.${task}.max_tokens`, { valueAsNumber: true })}
                 />
+                <FieldError id={`admin-${task}-max_tokens-error`} error={errors.model_defaults?.[task]?.max_tokens} />
               </label>
               <label className="admin-check">
                 <input
                   type="checkbox"
-                  checked={item.thinking}
-                  onChange={(event) => patchTask(task, { thinking: event.target.checked })}
+                  {...register(`model_defaults.${task}.thinking`)}
                 />
+                <FieldError id={`admin-${task}-thinking-error`} error={errors.model_defaults?.[task]?.thinking} />
                 <span>思考模式</span>
               </label>
             </div>
@@ -123,12 +106,11 @@ export default function AdminSettingsCard() {
       })}
 
       <div className="toolbar">
-        <button className="primary" onClick={() => void save()}>
+        <button className="primary" type="submit" disabled={isSubmitting}>
           保存管理员设置
         </button>
-        {saved && <span className="muted">已保存</span>}
       </div>
-    </div>
+    </form>
   );
 }
 

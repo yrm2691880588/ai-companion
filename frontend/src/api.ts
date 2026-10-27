@@ -157,11 +157,11 @@ export const api = {
   async me(): Promise<Account> {
     return request<Account>("/v1/me");
   },
-  async companions(): Promise<Companion[]> {
-    return request<Companion[]>("/v1/companions");
+  async companions(signal?: AbortSignal): Promise<Companion[]> {
+    return request<Companion[]>("/v1/companions", { signal });
   },
-  async companion(id: number): Promise<Companion> {
-    return request<Companion>(`/v1/companions/${id}`);
+  async companion(id: number, signal?: AbortSignal): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}`, { signal });
   },
   async createCompanion(persona: Persona, name?: string): Promise<Companion> {
     return request<Companion>("/v1/companions", {
@@ -219,11 +219,11 @@ export const api = {
       body: JSON.stringify({ avatar }),
     });
   },
-  async templates(): Promise<Template[]> {
-    return request<Template[]>("/v1/templates");
+  async templates(signal?: AbortSignal): Promise<Template[]> {
+    return request<Template[]>("/v1/templates", { signal });
   },
-  async sessions(companionId: number): Promise<Session[]> {
-    return request<Session[]>(`/v1/companions/${companionId}/sessions`);
+  async sessions(companionId: number, signal?: AbortSignal): Promise<Session[]> {
+    return request<Session[]>(`/v1/companions/${companionId}/sessions`, { signal });
   },
   async createSession(companionId: number, title = ""): Promise<Session> {
     return request<Session>(`/v1/companions/${companionId}/sessions`, {
@@ -246,17 +246,17 @@ export const api = {
   async deleteMessage(messageId: number): Promise<void> {
     await request<void>(`/v1/messages/${messageId}`, { method: "DELETE" });
   },
-  async latest(companionId: number): Promise<Latest> {
-    return request<Latest>(`/v1/companions/${companionId}/latest`);
+  async latest(companionId: number, signal?: AbortSignal): Promise<Latest> {
+    return request<Latest>(`/v1/companions/${companionId}/latest`, { signal });
   },
-  async messages(sessionId: number): Promise<Message[]> {
-    return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`);
+  async messages(sessionId: number, signal?: AbortSignal): Promise<Message[]> {
+    return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`, { signal });
   },
-  async summary(sessionId: number): Promise<Summary> {
-    return request<Summary>(`/v1/sessions/${sessionId}/summary`);
+  async summary(sessionId: number, signal?: AbortSignal): Promise<Summary> {
+    return request<Summary>(`/v1/sessions/${sessionId}/summary`, { signal });
   },
-  async memories(companionId: number): Promise<Memory[]> {
-    return request<Memory[]>(`/v1/companions/${companionId}/memories`);
+  async memories(companionId: number, signal?: AbortSignal): Promise<Memory[]> {
+    return request<Memory[]>(`/v1/companions/${companionId}/memories`, { signal });
   },
   async deleteMemory(id: number): Promise<void> {
     await request<void>(`/v1/memories/${id}`, { method: "DELETE" });
@@ -267,8 +267,8 @@ export const api = {
       body: JSON.stringify({ enabled }),
     });
   },
-  async scenarios(): Promise<Scenario[]> {
-    return request<Scenario[]>("/v1/roleplay/scenarios");
+  async scenarios(signal?: AbortSignal): Promise<Scenario[]> {
+    return request<Scenario[]>("/v1/roleplay/scenarios", { signal });
   },
   async startRoleplay(companionId: number, scenarioKey: string): Promise<RunStart> {
     return request<RunStart>(`/v1/companions/${companionId}/roleplay`, {
@@ -276,20 +276,20 @@ export const api = {
       body: JSON.stringify({ scenario_key: scenarioKey }),
     });
   },
-  async getRun(runId: number): Promise<Run> {
-    return request<Run>(`/v1/roleplay/${runId}`);
+  async getRun(runId: number, signal?: AbortSignal): Promise<Run> {
+    return request<Run>(`/v1/roleplay/${runId}`, { signal });
   },
   async finishRoleplay(runId: number): Promise<Run> {
     return request<Run>(`/v1/roleplay/${runId}/finish`, { method: "POST" });
   },
-  async providers(): Promise<Provider[]> {
-    return request<Provider[]>("/v1/model-providers");
+  async providers(signal?: AbortSignal): Promise<Provider[]> {
+    return request<Provider[]>("/v1/model-providers", { signal });
   },
-  async usage(days = 7): Promise<UsageSummary> {
-    return request<UsageSummary>(`/v1/me/usage/models?days=${days}`);
+  async usage(days = 7, signal?: AbortSignal): Promise<UsageSummary> {
+    return request<UsageSummary>(`/v1/me/usage/models?days=${days}`, { signal });
   },
-  async providerSettings(): Promise<ProviderSetting[]> {
-    return request<ProviderSetting[]>("/v1/provider-settings");
+  async providerSettings(signal?: AbortSignal): Promise<ProviderSetting[]> {
+    return request<ProviderSetting[]>("/v1/provider-settings", { signal });
   },
   async saveProviderSetting(
     key: string,
@@ -321,8 +321,8 @@ export const api = {
       body: JSON.stringify({ voice_id: voiceId }),
     });
   },
-  async voiceProviders(): Promise<VoiceProvider[]> {
-    return request<VoiceProvider[]>("/v1/voice/providers");
+  async voiceProviders(signal?: AbortSignal): Promise<VoiceProvider[]> {
+    return request<VoiceProvider[]>("/v1/voice/providers", { signal });
   },
   async saveVoiceProvider(
     key: string,
@@ -345,10 +345,9 @@ export const api = {
       { method: "POST" },
     );
   },
-  async voiceOptions(key: string, refresh = false): Promise<VoiceOption[]> {
+  async voiceOptions(key: string, refresh = false, signal?: AbortSignal): Promise<VoiceOption[]> {
     return request<VoiceOption[]>(
-      `/v1/voice/providers/${key}/voices${refresh ? "?refresh=true" : ""}`,
-    );
+      `/v1/voice/providers/${key}/voices${refresh ? "?refresh=true" : ""}`, { signal });
   },
   async transcribe(audio: Blob, providerKey = "volcengine"): Promise<{ text: string; duration_ms: number }> {
     const form = new FormData();
@@ -380,8 +379,8 @@ export const api = {
       }),
     });
   },
-  async getProfile(): Promise<UserProfile> {
-    return request<UserProfile>("/v1/me/profile");
+  async getProfile(signal?: AbortSignal): Promise<UserProfile> {
+    return request<UserProfile>("/v1/me/profile", { signal });
   },
   async saveProfile(profile: UserProfile): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile", {
@@ -389,8 +388,8 @@ export const api = {
       body: JSON.stringify(profile),
     });
   },
-  async getCompanionProfile(id: number): Promise<CompanionUserProfile> {
-    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`);
+  async getCompanionProfile(id: number, signal?: AbortSignal): Promise<CompanionUserProfile> {
+    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`, { signal });
   },
   async saveCompanionProfile(
     id: number,
@@ -404,8 +403,8 @@ export const api = {
   async quota(): Promise<Quota> {
     return request<Quota>("/v1/me/quota");
   },
-  async adminSettings(): Promise<AdminSettingsResponse> {
-    return request<AdminSettingsResponse>("/v1/admin/settings");
+  async adminSettings(signal?: AbortSignal): Promise<AdminSettingsResponse> {
+    return request<AdminSettingsResponse>("/v1/admin/settings", { signal });
   },
   async adminUpdate(patch: Partial<AdminSettings>): Promise<AdminSettingsResponse> {
     return request<AdminSettingsResponse>("/v1/admin/settings", {

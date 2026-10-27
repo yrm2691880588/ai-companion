@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import type { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { profileSchema, nullableNumber } from "../lib/forms";
+import FieldError from "./FieldError";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../api";
 import type { UserProfile } from "../lib/types";
 
@@ -18,43 +26,27 @@ const EMPTY: UserProfile = {
 };
 
 export default function UserProfileForm({ companionId, title, description }: Props) {
-  const [value, setValue] = useState<UserProfile>(EMPTY);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const client = useQueryClient();
+  const profileQuery = useQuery({ ...queries.profile(), enabled: !companionId });
+  const companionProfileQuery = useQuery({ ...queries.companionProfile(companionId ?? 0), enabled: !!companionId });
+  const data = companionId ? companionProfileQuery.data : profileQuery.data;
+  const value: z.infer<typeof profileSchema> = {
+    nickname: data?.nickname ?? EMPTY.nickname, identity: data?.identity ?? EMPTY.identity,
+    age: data?.age ?? null, gender: data?.gender ?? EMPTY.gender,
+    city: data?.city ?? EMPTY.city, background: data?.background ?? EMPTY.background,
+  };
+  const loadError = profileQuery.error?.message || companionProfileQuery.error?.message;
+  const loading = companionId ? companionProfileQuery.isPending : profileQuery.isPending;
+  const { register, handleSubmit, formState: { errors, isSubmitting: busy } } = useForm<z.infer<typeof profileSchema>>({
+    resolver: zodResolver(profileSchema), values: value, resetOptions: { keepDirtyValues: true }, mode: "onBlur",
+  });
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        if (companionId) {
-          const data = await api.getCompanionProfile(companionId);
-          setValue({
-            nickname: data.nickname ?? "",
-            identity: data.identity ?? "",
-            age: data.age ?? null,
-            gender: data.gender ?? "",
-            city: data.city ?? "",
-            background: data.background ?? "",
-          });
-        } else {
-          setValue(await api.getProfile());
-        }
-      } catch (event) {
-        setError((event as Error).message);
-      }
-    })();
-  }, [companionId]);
-
-  function update<K extends keyof UserProfile>(key: K, next: UserProfile[K]) {
-    setValue((prev) => ({ ...prev, [key]: next }));
-  }
-
-  async function save() {
-    setBusy(true);
+  async function save(value: UserProfile) {
     setError("");
     try {
       if (companionId) {
-        await api.saveCompanionProfile(companionId, {
+        const saved = await api.saveCompanionProfile(companionId, {
           nickname: value.nickname || null,
           identity: value.identity || null,
           age: value.age,
@@ -62,41 +54,40 @@ export default function UserProfileForm({ companionId, title, description }: Pro
           city: value.city || null,
           background: value.background || null,
         });
+        client.setQueryData(queries.companionProfile(companionId).queryKey, saved);
       } else {
-        await api.saveProfile(value);
+        const saved = await api.saveProfile(value);
+        client.setQueryData(queries.profile().queryKey, saved);
       }
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1500);
+      toast.success("已保存，下一条回复生效", { id: "profile-saved" });
     } catch (event) {
       setError((event as Error).message);
-    } finally {
-      setBusy(false);
     }
   }
 
   return (
-    <div className="card">
+    <form className="card" noValidate onSubmit={handleSubmit(save)}>
       <h2>{title}</h2>
       <p className="muted">{description}</p>
-      {error && <div className="alert">{error}</div>}
+      {(error || loadError) && <div className="alert">{error || loadError}</div>}
       <div className="field-grid">
         <div>
           <label htmlFor={`up-nick-${companionId ?? "me"}`}>她怎么称呼你</label>
           <input
             id={`up-nick-${companionId ?? "me"}`}
-            value={value.nickname}
+            {...register("nickname")} aria-invalid={!!errors.nickname} aria-describedby={`profile-nickname-${companionId ?? "me"}-error`}
             placeholder="小周 / 周哥 / 宝宝"
-            onChange={(event) => update("nickname", event.target.value)}
           />
+          <FieldError id={`profile-nickname-${companionId ?? "me"}-error`} error={errors.nickname} />
         </div>
         <div>
           <label htmlFor={`up-identity-${companionId ?? "me"}`}>你的身份</label>
           <input
             id={`up-identity-${companionId ?? "me"}`}
-            value={value.identity}
+            {...register("identity")} aria-invalid={!!errors.identity} aria-describedby={`profile-identity-${companionId ?? "me"}-error`}
             placeholder="大三学生 / 后端工程师"
-            onChange={(event) => update("identity", event.target.value)}
           />
+          <FieldError id={`profile-identity-${companionId ?? "me"}-error`} error={errors.identity} />
         </div>
         <div>
           <label htmlFor={`up-age-${companionId ?? "me"}`}>年龄</label>
@@ -105,36 +96,33 @@ export default function UserProfileForm({ companionId, title, description }: Pro
             type="number"
             min={18}
             max={99}
-            value={value.age ?? ""}
-            onChange={(event) =>
-              update("age", event.target.value === "" ? null : Number(event.target.value))
-            }
+            {...register("age", { setValueAs: nullableNumber })} aria-invalid={!!errors.age} aria-describedby={`profile-age-${companionId ?? "me"}-error`}
           />
+          <FieldError id={`profile-age-${companionId ?? "me"}-error`} error={errors.age} />
         </div>
         <div>
           <label htmlFor={`up-city-${companionId ?? "me"}`}>城市</label>
           <input
             id={`up-city-${companionId ?? "me"}`}
-            value={value.city}
+            {...register("city")} aria-invalid={!!errors.city} aria-describedby={`profile-city-${companionId ?? "me"}-error`}
             placeholder="杭州"
-            onChange={(event) => update("city", event.target.value)}
           />
+          <FieldError id={`profile-city-${companionId ?? "me"}-error`} error={errors.city} />
         </div>
       </div>
       <label htmlFor={`up-background-${companionId ?? "me"}`}>补充背景</label>
       <textarea
         id={`up-background-${companionId ?? "me"}`}
-        value={value.background}
+        {...register("background")} aria-invalid={!!errors.background} aria-describedby={`profile-background-${companionId ?? "me"}-error`}
         placeholder="最近在准备考研，晚上常熬夜；不喜欢被叫全名。"
-        onChange={(event) => update("background", event.target.value)}
       />
+          <FieldError id={`profile-background-${companionId ?? "me"}-error`} error={errors.background} />
       <div className="toolbar">
-        <button className="primary" disabled={busy} onClick={() => void save()}>
+        <button className="primary" disabled={busy || loading || !!loadError} type="submit">
           {busy ? "保存中…" : "保存"}
         </button>
-        {saved && <span className="muted">已保存，下一条回复生效</span>}
       </div>
-    </div>
+    </form>
   );
 }
 

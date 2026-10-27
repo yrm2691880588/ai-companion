@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import Modal from "./Modal";
 import PersonaForm from "./PersonaForm";
+import { personaSchema } from "../lib/forms";
 import type { Companion, Persona } from "../lib/types";
 
 export function downloadPersona(companion: Companion): void {
@@ -56,18 +57,22 @@ export default function PersonaImportButton({ onCreated }: Props) {
         throw new Error("文件里没有找到人设（persona）");
       }
       // 先预览，不创建
-      setDraft(parsed.persona as Persona);
+      const validated = personaSchema.safeParse(parsed.persona);
+      if (!validated.success) {
+        setError(validated.error.issues.map(item => `${item.path.join(".")}：${item.message}`).join("；"));
+        return;
+      }
+      setDraft(validated.data);
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
-  async function create() {
-    if (!draft) return;
+  async function create(persona: Persona) {
     setBusy(true);
     setError("");
     try {
-      const created = await api.importPersona(draft);
+      const created = await api.importPersona(persona);
       setDraft(null);
       onCreated(created);
     } catch (err) {
@@ -101,7 +106,7 @@ export default function PersonaImportButton({ onCreated }: Props) {
           className="import-modal"
           footer={
             <>
-              <button className="primary" disabled={busy} onClick={() => void create()}>
+              <button className="primary" disabled={busy} type="submit" form="import-persona">
                 {busy ? "创建中…" : "用这版人设创建伴侣"}
               </button>
               <button className="ghost" disabled={busy} onClick={() => setDraft(null)}>
@@ -112,7 +117,7 @@ export default function PersonaImportButton({ onCreated }: Props) {
         >
           {error && <div className="alert">{error}</div>}
           <div className="import-form">
-            <PersonaForm value={draft} onChange={setDraft} disabled={busy} />
+            <PersonaForm formId="import-persona" value={draft} onSubmit={create} disabled={busy} />
           </div>
         </Modal>
       )}

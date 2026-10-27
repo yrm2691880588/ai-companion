@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
 import { api } from "../api";
 import { playAudio } from "../lib/voice";
 import type { VoiceOption } from "../lib/types";
@@ -10,31 +12,14 @@ interface Props {
 }
 
 export default function VoicePicker({ companionId, value, onChange }: Props) {
-  const [voices, setVoices] = useState<VoiceOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const providersQuery = useQuery(queries.voiceProviders());
+  const configured = providersQuery.data?.some(item => item.configured && item.enabled) ?? false;
+  const voicesQuery = useQuery({ ...queries.voices("volcengine"), enabled: configured });
+  const voices = voicesQuery.data ?? [];
+  const loading = providersQuery.isPending || (configured && voicesQuery.isPending);
+  const loadError = providersQuery.error?.message || voicesQuery.error?.message;
   const [error, setError] = useState("");
   const [previewing, setPreviewing] = useState<string | null>(null);
-  const [configured, setConfigured] = useState(false);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const providers = await api.voiceProviders();
-        const ready = providers.some((item) => item.configured && item.enabled);
-        setConfigured(ready);
-        if (!ready) {
-          setLoading(false);
-          return;
-        }
-        setVoices(await api.voiceOptions("volcengine"));
-      } catch (event) {
-        setError((event as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
   async function preview(voice: VoiceOption) {
     setPreviewing(voice.voice_id);
     try {
@@ -47,6 +32,10 @@ export default function VoicePicker({ companionId, value, onChange }: Props) {
       setError((event as Error).message);
       setPreviewing(null);
     }
+  }
+
+  if (loading || loadError) {
+    return <div className="card"><h2>她的声音</h2><p className={loadError ? "alert" : "muted"}>{loadError || "加载中…"}</p></div>;
   }
 
   if (!configured) {
