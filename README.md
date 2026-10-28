@@ -193,6 +193,7 @@ Invoke-RestMethod "http://127.0.0.1:8000/v1/me/usage/models?days=7" -Headers @{ 
 | 架构决策 | [docs/adr/](docs/adr/) | 0001–0019，主体 0001–0013，语音 0014–0019 |
 | 功能规格 | [docs/specs/](docs/specs/) | 0001 首次体验、0002 语音对话 |
 | 工单 | [docs/tickets/](docs/tickets/) | 0001 P0 首批、0002 语音 |
+| **待办与优先级** | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | **当前待办的真源**：已完成、待办、已知债务、非目标、基线 |
 
 ### 能力说明（当前有效）
 
