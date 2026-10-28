@@ -7,8 +7,10 @@ import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./styles.css";
 import { applyTheme, loadTheme } from "./lib/theme";
+import { installGlobalErrorReporting } from "./lib/error-report";
 
 applyTheme(loadTheme());
+installGlobalErrorReporting();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

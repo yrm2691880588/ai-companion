@@ -11,10 +11,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_user_id
 from app.core.version import app_version, migration_head
@@ -71,3 +73,30 @@ async def update_check(request: Request, _user: UserDep) -> dict[str, Any]:
         "update_available": bool(latest and latest.lstrip("v") != current),
         "url": payload.get("html_url"),
     }
+
+
+class ClientErrorIn(BaseModel):
+    """前端上报的崩溃信息：只收堆栈与版本，不收任何对话内容。"""
+
+    message: str = Field(max_length=500)
+    stack: str = Field(default="", max_length=4000)
+    component: str = Field(default="", max_length=200)
+    url: str = Field(default="", max_length=300)
+
+
+@router.post("/client-error")
+async def report_client_error(
+    payload: ClientErrorIn, request: Request, _user: UserDep
+) -> dict[str, str]:
+    """记录前端崩溃到服务端日志，便于用户导出后排查。
+
+    显式不接收聊天内容、用户身份或其他个人数据。
+    """
+    logging.getLogger("app.client").error(
+        "前端崩溃 url=%s component=%s message=%s stack=%s",
+        payload.url,
+        payload.component,
+        payload.message,
+        payload.stack,
+    )
+    return {"status": "logged"}

@@ -37,6 +37,7 @@ from app.api.v1.voice import router as voice_router
 from app.core.config import Settings, get_settings
 from app.core.device import DEVICE_HEADER, device_scope
 from app.core.errors import AppError
+from app.core.logging_setup import resolve_log_dir, setup_file_logging
 from app.core.version import app_version
 from app.domain.auth import AuthRepository, AuthService
 from app.domain.chat import ChatRepository, ChatService, ChatStreamer
@@ -138,6 +139,12 @@ def create_app(
     system_settings_repo: SystemSettingsRepository | None = None,
 ) -> FastAPI:
     resolved = settings or get_settings()
+    log_path = setup_file_logging(
+        resolve_log_dir(str(getattr(resolved, "log_dir", "") or "")),
+        level=getattr(logging, str(resolved.log_level).upper(), logging.INFO),
+    )
+    if log_path is not None:
+        _LOG.info("错误日志写入 %s", log_path)
     registry = ModelRegistry.from_presets(keys=resolved.provider_keys())
 
     engine = build_engine(resolved.database_url)
@@ -360,7 +367,26 @@ def create_app(
     app.state.trial_service = trial_service
     app.state.analytics_repo = analytics_repo
     app.state.user_profile_service = profile_service
+
+    async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+        """兜底：记录完整堆栈到日志，对外只回通用错误，不泄露内部细节。"""
+        _LOG.error(
+            "未处理异常 path=%s method=%s",
+            request.url.path,
+            request.method,
+            exc_info=exc,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": "INTERNAL_ERROR",
+                "message": "服务器内部错误，请查看日志",
+                "details": {},
+            },
+        )
+
     app.add_exception_handler(AppError, _app_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, _unhandled_handler)  # type: ignore[arg-type]
     app.include_router(models_router)
     app.include_router(usage_router)
     app.include_router(personas_router)

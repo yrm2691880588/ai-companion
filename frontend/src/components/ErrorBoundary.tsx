@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportClientError } from "../lib/error-report";
 
 interface Props {
   children: ReactNode;
@@ -17,6 +18,11 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("页面渲染出错", error, info.componentStack);
+    reportClientError({
+      message: error.message,
+      stack: error.stack,
+      component: `ErrorBoundary:${(info.componentStack ?? "").slice(0, 120)}`,
+    });
   }
 
   render() {
