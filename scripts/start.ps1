@@ -60,6 +60,11 @@ function Ensure-Frontend {
     Push-Location (Join-Path $Root 'frontend')
     try {
         pnpm install
+        # VAD 的模型与 wasm 不进仓库，构建前从 node_modules 复制到 public
+        & $Python (Join-Path $Root 'scripts/sync_vad_assets.py')
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host 'VAD 资源同步失败，语音功能可能不可用（其他功能不受影响）。' -ForegroundColor Yellow
+        }
         pnpm build
     } finally {
         Pop-Location

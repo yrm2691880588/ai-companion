@@ -7,9 +7,18 @@ from app.infra.voice.volcengine import VolcengineVoiceProvider
 
 
 class VoiceProviderRegistry:
-    def __init__(self, providers: dict[str, VoiceProvider] | None = None) -> None:
+    def __init__(
+        self,
+        providers: dict[str, VoiceProvider] | None = None,
+        *,
+        tts_resource_id: str = "",
+        asr_resource_id: str = "",
+    ) -> None:
         self._providers: dict[str, VoiceProvider] = providers or {
-            "volcengine": VolcengineVoiceProvider()
+            "volcengine": VolcengineVoiceProvider(
+                tts_resource_id=tts_resource_id or "seed-tts-2.0",
+                asr_resource_id=asr_resource_id or "volc.seedasr.auc",
+            )
         }
 
     @property

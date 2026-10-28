@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # 是否监听局域网（true=0.0.0.0，手机可访问；false=仅本机）。
     # 由 scripts/start.ps1 读取并决定 uvicorn 的 --host；应用本身不消费此值。
     listen_lan: bool = False
+    # 火山语音资源 ID（新版控制台）；不同账号套餐可能不同，留空用默认值
+    voice_tts_resource_id: str = "seed-tts-2.0"
+    voice_asr_resource_id: str = "volc.seedasr.auc"
     # 错误日志目录；留空则用仓库下的 logs/（不进版本库）
     log_dir: str = ""
     # 更新检查地址（GitHub Release API 等）；留空则不联网检查

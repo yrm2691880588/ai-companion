@@ -182,7 +182,10 @@ def create_app(
         else SqlCustomModelRepository(session_factory)
     )
     box = _secret_box(resolved)
-    voice_registry = VoiceProviderRegistry()
+    voice_registry = VoiceProviderRegistry(
+        tts_resource_id=resolved.voice_tts_resource_id,
+        asr_resource_id=resolved.voice_asr_resource_id,
+    )
     if resolved.env == "test":
         voice_settings_store = InMemoryVoiceSettingsRepository()
         voice_voices_store = InMemoryVoiceVoiceRepository()
@@ -429,6 +432,18 @@ def create_app(
     return app
 
 
+# 静态资源 MIME：Python 默认表缺 .mjs / .wasm，浏览器会拒绝加载 ES 模块
+_STATIC_MEDIA_TYPES = {
+    ".mjs": "text/javascript",
+    ".js": "text/javascript",
+    ".wasm": "application/wasm",
+    ".onnx": "application/octet-stream",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".webmanifest": "application/manifest+json",
+}
+
+
 def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
     """有构建产物时，由后端直接托管前端，双击启动只需一个进程。"""
     dist = (
@@ -449,7 +464,11 @@ def _mount_frontend(app: FastAPI, dist_setting: str) -> None:
             raise AppError(code="NOT_FOUND", message="接口不存在", status_code=404)
         candidate = dist / full_path
         if full_path and candidate.is_file():
-            return FileResponse(candidate)
+            # .mjs 必须回 text/javascript，否则浏览器拒绝当 ES 模块加载
+            # （VAD 的 onnxruntime wasm 加载器就是 .mjs，漏了会直接报
+            #  "Failed to fetch dynamically imported module"）
+            media_type = _STATIC_MEDIA_TYPES.get(candidate.suffix.lower())
+            return FileResponse(candidate, media_type=media_type)
         if full_path and candidate.suffix:
             raise AppError(code="NOT_FOUND", message="文件不存在", status_code=404)
         return FileResponse(index)

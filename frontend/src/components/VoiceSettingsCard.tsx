@@ -15,20 +15,29 @@ const GUIDE_STEPS = [
     detail: "打开 console.volcengine.com，用手机号或账号登录。",
   },
   {
-    title: "2. 开通语音技术",
-    detail: "在控制台搜索「语音技术」或「豆包语音」，进入后按提示开通（有免费额度试）。",
+    title: "2. 进入「豆包语音」→「应用管理」",
+    detail:
+      "在左侧菜单找到「豆包语音」，点「应用管理」。这里会列出你所有的应用，每个应用有独立的 AppID。",
   },
   {
-    title: "3. 创建应用",
-    detail: "在语音技术控制台里创建一个应用，勾选「语音合成」与「语音识别」两个能力。",
+    title: "3. 创建应用（或用已有的）",
+    detail:
+      "点「创建应用」，填个名字（例如 yuying）。已有应用也可以直接用，点名字右边的编辑按钮。",
   },
   {
-    title: "4. 复制 AppID 与 Access Token",
-    detail: "应用详情里能看到 AppID 和一串 Access Token，两个都要复制下来。",
+    title: "4. 【关键】勾选这两项能力",
+    detail:
+      "在「接入能力」里必须勾选：① 豆包语音合成模型 2.0（负责她说话）② 录音文件识别模型 2.0 · 标准版（负责听你说话）。少勾任何一项，功能就会报「resource not granted」。",
   },
   {
-    title: "5. 回到这里粘贴保存",
-    detail: "把 AppID 与 Token 填进下面的输入框，点保存，再点「测试连接」确认通了。",
+    title: "5. 复制 AppID 和 Access Token",
+    detail:
+      "应用列表里能看到 AppID（一串数字，例如 4982965749）。Access Token 在应用详情或「API Key 管理」里，点显示后复制。",
+  },
+  {
+    title: "6. 回到这里粘贴保存",
+    detail:
+      "把 AppID 和 Access Token 填进下面的输入框，点保存，再点「测试连接」。看到「连接成功」就说明配置对了。",
   },
 ];
 

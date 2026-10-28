@@ -43,3 +43,11 @@ pytest-of-*/
 
 # 运行期错误日志（含堆栈，不含对话内容）
 logs/
+
+# VAD 运行期资源（模型 + wasm，由 scripts/sync_vad_assets.py 生成）
+frontend/public/vad/
+
+
+# 语音合成音频临时目录
+ai-companion-audio/
+

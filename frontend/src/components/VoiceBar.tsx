@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { formatDuration, isRecordingSupported, startRecording } from "../lib/voice";
+import { formatDuration, isRecordingSupported, startVadRecording } from "../lib/voice";
 import type { Recorder } from "../lib/voice";
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
   providerKey?: string;
 }
 
-type Phase = "idle" | "recording" | "uploading";
+type Phase = "idle" | "listening" | "uploading";
 
 export default function VoiceBar({ onTranscribed, available, providerKey = "volcengine" }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -19,15 +19,23 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const recorderRef = useRef<Recorder | null>(null);
-  const autoStopRef = useRef(false);
+  const tickerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     return () => {
-      recorderRef.current?.cancel();
+      recorderRef.current?.stop();
+      if (tickerRef.current !== undefined) window.clearInterval(tickerRef.current);
     };
   }, []);
 
   if (!isRecordingSupported()) return null;
+
+  function clearTicker() {
+    if (tickerRef.current !== undefined) {
+      window.clearInterval(tickerRef.current);
+      tickerRef.current = undefined;
+    }
+  }
 
   async function begin() {
     if (!available) {
@@ -35,61 +43,62 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
       return;
     }
     setError("");
-    autoStopRef.current = false;
+    setPhase("listening");
+    setLevel(0);
+    setElapsed(0);
     try {
-      const recorder = await startRecording({
+      // VAD 自动检测说完，用户不需要点任何按钮
+      const recorder = await startVadRecording({
         onLevel: setLevel,
+        onSpeechStart: () => setPhase("listening"),
+        onSpeechEnd: (audio) => {
+          clearTicker();
+          void sendAudio(audio);
+        },
         onTimeout: () => {
-          autoStopRef.current = true;
-          void finish();
+          clearTicker();
+          setError("已到 60 秒上限，自动结束");
+          window.setTimeout(() => setError(""), 2500);
+          setPhase("idle");
         },
       });
       recorderRef.current = recorder;
-      setPhase("recording");
-      setElapsed(0);
-      const ticker = window.setInterval(() => {
-        setElapsed(recorder.elapsedMs());
+      tickerRef.current = window.setInterval(() => {
+        setElapsed(recorderRef.current?.elapsedMs() ?? 0);
       }, 200);
-      window.setTimeout(() => window.clearInterval(ticker), 65_000);
     } catch (event) {
       setError((event as Error).message);
       setPhase("idle");
     }
   }
 
-  async function finish() {
-    const recorder = recorderRef.current;
-    if (!recorder) return;
+  async function sendAudio(audio: Blob) {
+    recorderRef.current = null;
     setPhase("uploading");
+    setLevel(0);
     try {
-      const blob = await recorder.stop();
-      recorderRef.current = null;
-      const result = await api.transcribe(blob, providerKey);
+      const result = await api.transcribe(audio, providerKey);
       setPhase("idle");
-      setLevel(0);
       setElapsed(0);
-      if (autoStopRef.current) {
-        setError("已到 60 秒上限，自动结束录音");
-        window.setTimeout(() => setError(""), 2500);
-      }
       if (result.text.trim()) onTranscribed(result.text.trim());
+      else setError("没有听清，请再说一次");
     } catch (event) {
       setError((event as Error).message);
       setPhase("idle");
-      setLevel(0);
-      recorderRef.current = null;
+      setElapsed(0);
     }
   }
 
   function cancel() {
-    recorderRef.current?.cancel();
+    recorderRef.current?.stop();
     recorderRef.current = null;
+    clearTicker();
     setPhase("idle");
     setLevel(0);
     setElapsed(0);
   }
 
-  if (phase === "recording") {
+  if (phase === "listening") {
     return (
       <div className="voice-bar">
         <span className="voice-dot" />
@@ -97,9 +106,9 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
         <div className="voice-meter">
           <div className="voice-meter-fill" style={{ width: `${Math.round(level * 100)}%` }} />
         </div>
-        <button className="btn primary" onClick={() => void finish()}>
-          说完了
-        </button>
+        <span className="muted" style={{ fontSize: 12 }}>
+          说完自动发送，不用点
+        </span>
         <button className="btn ghost" onClick={cancel}>
           取消
         </button>
@@ -112,14 +121,13 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
       <button
         className="btn ghost voice-mic"
         disabled={phase === "uploading"}
-        title={available ? "点一下开始说话" : "先配置语音供应商"}
+        title={available ? "点一下开始说话，说完自动发送" : "先配置语音供应商"}
         onClick={() => void begin()}
       >
-        {phase === "uploading" ? "识别中…" : "🎤 语音"}
+        {phase === "uploading" ? "识别中…" : "🎤 说话"}
       </button>
       {!available && <span className="muted">语音未配置</span>}
       {error && <span className="voice-error">{error}</span>}
     </div>
   );
 }
-
