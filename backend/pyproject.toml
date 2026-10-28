@@ -38,6 +38,8 @@ include = ["app*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-q"
+# 让测试能导入仓库根 scripts/ 下的维护脚本（如 backup_db）
+pythonpath = [".."]
 
 [tool.ruff]
 line-length = 100

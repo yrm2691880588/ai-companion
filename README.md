@@ -146,6 +146,26 @@ Push-Location backend; .venv/Scripts/python.exe -m pytest -q; Pop-Location
 测试覆盖：定价/预算公式、token 估算与裁剪、消息裁剪、SSE 解析与错误映射、路由降级与中断语义、
 注册表预设、密钥加密、SSRF 防护、调用记账、HTTP 接口。
 
+## 备份与恢复
+
+数据库里是你的全部伴侣、会话、记忆与设置。升级或换机前先备份：
+
+```powershell
+# 备份到文件（默认 tmp/backup.json，约几百 KB）
+backend/.venv/Scripts/python.exe scripts/backup_db.py --out tmp/backup.json
+
+# 恢复（会清空现有数据，必须加 --yes）
+backend/.venv/Scripts/python.exe scripts/backup_db.py --restore tmp/backup.json --yes
+```
+
+| 项 | 说明 |
+|---|---|
+| 备份内容 | 全部业务表：伴侣、人设版本、会话、消息、记忆、摘要、演练、供应商配置等 |
+| 不备份 | 登录会话、短信验证码、调用流水、埋点、同步队列——这些属于运行期状态 |
+| 兼容性 | 备份文件带 `format` 与 `version`；版本不一致会拒绝恢复，避免写坏数据 |
+| 依赖 | 纯 Python 直连，**不需要装 pg_dump** |
+| 恢复顺序 | 按外键依赖自动排序（父表先写），不会因约束冲突失败 |
+
 ## 查询用量（真实调用落库后）
 
 ```powershell
