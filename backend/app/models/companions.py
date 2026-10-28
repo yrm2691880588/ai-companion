@@ -38,6 +38,8 @@ class Companion(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     derived_from: Mapped[int | None] = mapped_column(BigInteger)
+    voice_id: Mapped[str | None] = mapped_column(String(128))
+    voice_params: Mapped[dict[str, object] | None] = mapped_column(JSONType)
 
     personas: Mapped[list[CompanionPersona]] = relationship(
         back_populates="companion", cascade="all, delete-orphan"

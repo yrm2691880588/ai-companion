@@ -1,3 +1,5 @@
+import { createParser } from "eventsource-parser";
+import { apiUrl, authHeaders } from "./lib/client";
 import type {
   Account,
   AdminSettings,
@@ -21,18 +23,13 @@ import type {
   Summary,
   Template,
   UsageSummary,
+  VoiceOption,
+  VoiceProvider,
+  VoiceSynthesis,
   UserProfile,
-} from "./types";
+} from "./lib/types";
 
-const USER_KEY = "ai-companion-user-id";
-
-export function getUserId(): string {
-  return localStorage.getItem(USER_KEY) || "dev-user";
-}
-
-export function setUserId(value: string): void {
-  localStorage.setItem(USER_KEY, value.trim() || "dev-user");
-}
+export { getUserId, setUserId, getDeviceId, apiUrl } from "./lib/client";
 
 export class ApiError extends Error {
   code: string;
@@ -43,11 +40,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-User-Id": getUserId(),
+      ...authHeaders(),
       ...(init?.headers ?? {}),
     },
   });
@@ -84,11 +81,11 @@ export async function streamEvents(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-User-Id": getUserId(),
+      ...authHeaders(),
       Accept: "text/event-stream",
     },
     body: JSON.stringify(body),
@@ -101,34 +98,24 @@ export async function streamEvents(
     };
     throw new ApiError(payload.code ?? String(response.status), payload.message ?? "请求失败");
   }
+  // 分块解析交给 eventsource-parser：它按规范处理跨块截断、多行 data 与注释行
+  const parser = createParser({
+    onEvent: (message) => dispatchEvent(message.event ?? "message", message.data, handlers),
+  });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      handleBlock(block, handlers);
-      boundary = buffer.indexOf("\n\n");
-    }
+    parser.feed(decoder.decode(value, { stream: true }));
   }
 }
 
-function handleBlock(block: string, handlers: StreamHandlers): void {
-  let event = "message";
-  const dataLines: string[] = [];
-  for (const line of block.split("\n")) {
-    if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-  }
-  if (dataLines.length === 0) return;
+function dispatchEvent(event: string, data: string, handlers: StreamHandlers): void {
+  if (!data) return;
   let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+    payload = JSON.parse(data) as Record<string, unknown>;
   } catch {
     return;
   }
@@ -161,11 +148,11 @@ export const api = {
   async me(): Promise<Account> {
     return request<Account>("/v1/me");
   },
-  async companions(): Promise<Companion[]> {
-    return request<Companion[]>("/v1/companions");
+  async companions(signal?: AbortSignal): Promise<Companion[]> {
+    return request<Companion[]>("/v1/companions", { signal });
   },
-  async companion(id: number): Promise<Companion> {
-    return request<Companion>(`/v1/companions/${id}`);
+  async companion(id: number, signal?: AbortSignal): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}`, { signal });
   },
   async createCompanion(persona: Persona, name?: string): Promise<Companion> {
     return request<Companion>("/v1/companions", {
@@ -174,9 +161,9 @@ export const api = {
     });
   },
   async trialChat(persona: Persona, content: string, trialId?: string): Promise<Response> {
-    return fetch("/v1/trial/chat", {
+    return fetch(apiUrl("/v1/trial/chat"), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Id": getUserId() },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ persona, content, trial_id: trialId }),
     });
   },
@@ -223,11 +210,11 @@ export const api = {
       body: JSON.stringify({ avatar }),
     });
   },
-  async templates(): Promise<Template[]> {
-    return request<Template[]>("/v1/templates");
+  async templates(signal?: AbortSignal): Promise<Template[]> {
+    return request<Template[]>("/v1/templates", { signal });
   },
-  async sessions(companionId: number): Promise<Session[]> {
-    return request<Session[]>(`/v1/companions/${companionId}/sessions`);
+  async sessions(companionId: number, signal?: AbortSignal): Promise<Session[]> {
+    return request<Session[]>(`/v1/companions/${companionId}/sessions`, { signal });
   },
   async createSession(companionId: number, title = ""): Promise<Session> {
     return request<Session>(`/v1/companions/${companionId}/sessions`, {
@@ -250,17 +237,17 @@ export const api = {
   async deleteMessage(messageId: number): Promise<void> {
     await request<void>(`/v1/messages/${messageId}`, { method: "DELETE" });
   },
-  async latest(companionId: number): Promise<Latest> {
-    return request<Latest>(`/v1/companions/${companionId}/latest`);
+  async latest(companionId: number, signal?: AbortSignal): Promise<Latest> {
+    return request<Latest>(`/v1/companions/${companionId}/latest`, { signal });
   },
-  async messages(sessionId: number): Promise<Message[]> {
-    return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`);
+  async messages(sessionId: number, signal?: AbortSignal): Promise<Message[]> {
+    return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`, { signal });
   },
-  async summary(sessionId: number): Promise<Summary> {
-    return request<Summary>(`/v1/sessions/${sessionId}/summary`);
+  async summary(sessionId: number, signal?: AbortSignal): Promise<Summary> {
+    return request<Summary>(`/v1/sessions/${sessionId}/summary`, { signal });
   },
-  async memories(companionId: number): Promise<Memory[]> {
-    return request<Memory[]>(`/v1/companions/${companionId}/memories`);
+  async memories(companionId: number, signal?: AbortSignal): Promise<Memory[]> {
+    return request<Memory[]>(`/v1/companions/${companionId}/memories`, { signal });
   },
   async deleteMemory(id: number): Promise<void> {
     await request<void>(`/v1/memories/${id}`, { method: "DELETE" });
@@ -271,8 +258,8 @@ export const api = {
       body: JSON.stringify({ enabled }),
     });
   },
-  async scenarios(): Promise<Scenario[]> {
-    return request<Scenario[]>("/v1/roleplay/scenarios");
+  async scenarios(signal?: AbortSignal): Promise<Scenario[]> {
+    return request<Scenario[]>("/v1/roleplay/scenarios", { signal });
   },
   async startRoleplay(companionId: number, scenarioKey: string): Promise<RunStart> {
     return request<RunStart>(`/v1/companions/${companionId}/roleplay`, {
@@ -280,20 +267,20 @@ export const api = {
       body: JSON.stringify({ scenario_key: scenarioKey }),
     });
   },
-  async getRun(runId: number): Promise<Run> {
-    return request<Run>(`/v1/roleplay/${runId}`);
+  async getRun(runId: number, signal?: AbortSignal): Promise<Run> {
+    return request<Run>(`/v1/roleplay/${runId}`, { signal });
   },
   async finishRoleplay(runId: number): Promise<Run> {
     return request<Run>(`/v1/roleplay/${runId}/finish`, { method: "POST" });
   },
-  async providers(): Promise<Provider[]> {
-    return request<Provider[]>("/v1/model-providers");
+  async providers(signal?: AbortSignal): Promise<Provider[]> {
+    return request<Provider[]>("/v1/model-providers", { signal });
   },
-  async usage(days = 7): Promise<UsageSummary> {
-    return request<UsageSummary>(`/v1/me/usage/models?days=${days}`);
+  async usage(days = 7, signal?: AbortSignal): Promise<UsageSummary> {
+    return request<UsageSummary>(`/v1/me/usage/models?days=${days}`, { signal });
   },
-  async providerSettings(): Promise<ProviderSetting[]> {
-    return request<ProviderSetting[]>("/v1/provider-settings");
+  async providerSettings(signal?: AbortSignal): Promise<ProviderSetting[]> {
+    return request<ProviderSetting[]>("/v1/provider-settings", { signal });
   },
   async saveProviderSetting(
     key: string,
@@ -319,8 +306,72 @@ export const api = {
       { method: "POST" },
     );
   },
-  async getProfile(): Promise<UserProfile> {
-    return request<UserProfile>("/v1/me/profile");
+  async setCompanionVoice(id: number, voiceId: string | null): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}/voice`, {
+      method: "PUT",
+      body: JSON.stringify({ voice_id: voiceId }),
+    });
+  },
+  async voiceProviders(signal?: AbortSignal): Promise<VoiceProvider[]> {
+    return request<VoiceProvider[]>("/v1/voice/providers", { signal });
+  },
+  async saveVoiceProvider(
+    key: string,
+    patch: {
+      app_id?: string;
+      token?: string;
+      cluster?: string;
+      base_url?: string | null;
+      enabled?: boolean;
+    },
+  ): Promise<VoiceProvider> {
+    return request<VoiceProvider>(`/v1/voice/providers/${key}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+  },
+  async probeVoiceProvider(key: string): Promise<{ ok: boolean; voice_count?: number }> {
+    return request<{ ok: boolean; voice_count?: number }>(
+      `/v1/voice/providers/${key}/probe`,
+      { method: "POST" },
+    );
+  },
+  async voiceOptions(key: string, refresh = false, signal?: AbortSignal): Promise<VoiceOption[]> {
+    return request<VoiceOption[]>(
+      `/v1/voice/providers/${key}/voices${refresh ? "?refresh=true" : ""}`, { signal });
+  },
+  async transcribe(audio: Blob, providerKey = "volcengine"): Promise<{ text: string; duration_ms: number }> {
+    const form = new FormData();
+    form.append("file", audio, "voice.webm");
+    const response = await fetch(apiUrl(`/v1/voice/transcribe?provider_key=${providerKey}`), {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || `识别失败（${response.status}）`);
+    }
+    return (await response.json()) as { text: string; duration_ms: number };
+  },
+  async synthesize(
+    text: string,
+    voiceId: string,
+    options: { providerKey?: string; params?: Record<string, unknown>; sessionId?: number } = {},
+  ): Promise<VoiceSynthesis> {
+    return request<VoiceSynthesis>("/v1/voice/synthesize", {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        voice_id: voiceId,
+        provider_key: options.providerKey ?? "volcengine",
+        params: options.params ?? null,
+        session_id: options.sessionId ?? null,
+      }),
+    });
+  },
+  async getProfile(signal?: AbortSignal): Promise<UserProfile> {
+    return request<UserProfile>("/v1/me/profile", { signal });
   },
   async saveProfile(profile: UserProfile): Promise<UserProfile> {
     return request<UserProfile>("/v1/me/profile", {
@@ -328,8 +379,8 @@ export const api = {
       body: JSON.stringify(profile),
     });
   },
-  async getCompanionProfile(id: number): Promise<CompanionUserProfile> {
-    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`);
+  async getCompanionProfile(id: number, signal?: AbortSignal): Promise<CompanionUserProfile> {
+    return request<CompanionUserProfile>(`/v1/me/companions/${id}/profile`, { signal });
   },
   async saveCompanionProfile(
     id: number,
@@ -343,8 +394,8 @@ export const api = {
   async quota(): Promise<Quota> {
     return request<Quota>("/v1/me/quota");
   },
-  async adminSettings(): Promise<AdminSettingsResponse> {
-    return request<AdminSettingsResponse>("/v1/admin/settings");
+  async adminSettings(signal?: AbortSignal): Promise<AdminSettingsResponse> {
+    return request<AdminSettingsResponse>("/v1/admin/settings", { signal });
   },
   async adminUpdate(patch: Partial<AdminSettings>): Promise<AdminSettingsResponse> {
     return request<AdminSettingsResponse>("/v1/admin/settings", {
@@ -353,6 +404,12 @@ export const api = {
     });
   },
 };
+
+
+
+
+
+
 
 
 

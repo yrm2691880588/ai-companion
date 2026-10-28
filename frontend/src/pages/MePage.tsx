@@ -1,26 +1,15 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
 import { Link } from "react-router-dom";
-import { api } from "../api";
 import AppearanceCard from "../components/AppearanceCard";
 import UserProfileForm from "../components/UserProfileForm";
-import type { Provider, UsageSummary } from "../types";
 
 export default function MePage() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
-        setProviders(list);
-        setUsage(summary);
-      } catch (event) {
-        setError((event as Error).message);
-      }
-    })();
-  }, []);
+  const providerQuery = useQuery(queries.providers());
+  const usageQuery = useQuery(queries.usage());
+  const providers = providerQuery.data ?? [];
+  const usage = usageQuery.data;
+  const error = providerQuery.error?.message || usageQuery.error?.message;
 
   return (
     <div>
@@ -85,3 +74,4 @@ export default function MePage() {
     </div>
   );
 }
+

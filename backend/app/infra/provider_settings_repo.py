@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.domain.provider_settings import ProviderSetting
 from app.models.provider_settings import ProviderSettingRow
 from app.security.crypto import SecretBox
+
+_LOG = logging.getLogger(__name__)
 
 
 class SqlProviderSettingsRepository:
@@ -27,6 +31,8 @@ class SqlProviderSettingsRepository:
                 try:
                     api_key = self._box.decrypt(row.api_key_enc)
                 except Exception:
+                    # 密钥轮换或密文损坏：不能静默当作"没配置 Key"
+                    _LOG.warning("供应商 Key 解密失败 provider=%s", row.provider_key, exc_info=True)
                     api_key = ""
             result[row.provider_key] = ProviderSetting(
                 provider_key=row.provider_key,

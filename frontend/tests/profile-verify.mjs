@@ -39,3 +39,4 @@ await page.screenshot({ path: "tmp/verify-profile-companion.png", fullPage: true
 console.log("JS 错误:", errors.length);
 
 await browser.close();
+

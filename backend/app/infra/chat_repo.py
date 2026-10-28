@@ -7,8 +7,10 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.device import current_device_id
 from app.core.ids import new_ulid
 from app.domain.chat import MessageRecord, SessionRecord
+from app.domain.sync import record
 from app.models.chat import ChatMessage, ChatSession
 
 
@@ -25,12 +27,21 @@ class SqlChatRepository:
                 companion_id=companion_id,
                 title=title,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
             )
             session.add(row)
+            await session.flush()
+            record(
+                session,
+                entity_type="session",
+                entity_ulid=row.ulid,
+                operation="create",
+                payload={"companion_id": companion_id, "title": title},
+            )
             await session.commit()
             return SessionRecord(
                 id=row.id,
+                ulid=row.ulid,
                 companion_id=companion_id,
                 user_id=user_id,
                 title=title,
@@ -150,12 +161,20 @@ class SqlChatRepository:
                 content=content,
                 client_request_id=client_request_id,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
             )
             session.add(row)
             chat_session = await session.get(ChatSession, session_id)
             if chat_session is not None:
                 chat_session.last_message_at = datetime.now(UTC)
+            await session.flush()
+            record(
+                session,
+                entity_type="message",
+                entity_ulid=row.ulid,
+                operation="append",
+                payload={"session_id": session_id, "role": role, "seq": row.seq},
+            )
             await session.commit()
             return _to_message(row)
 
@@ -295,6 +314,7 @@ class SqlChatRepository:
 def _to_session(row: ChatSession) -> SessionRecord:
     return SessionRecord(
         id=row.id,
+        ulid=row.ulid,
         companion_id=row.companion_id,
         user_id=row.user_id,
         title=row.title,
@@ -307,6 +327,7 @@ def _to_session(row: ChatSession) -> SessionRecord:
 def _to_message(row: ChatMessage) -> MessageRecord:
     return MessageRecord(
         id=row.id,
+        ulid=row.ulid,
         session_id=row.session_id,
         seq=row.seq,
         role=row.role,

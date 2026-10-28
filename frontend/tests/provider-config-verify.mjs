@@ -22,3 +22,4 @@ await page.screenshot({ path: "tmp/verify-provider-config.png", fullPage: true }
 await page.getByRole("button", { name: "取消" }).click();
 console.log("JS 错误:", errors.length);
 await browser.close();
+

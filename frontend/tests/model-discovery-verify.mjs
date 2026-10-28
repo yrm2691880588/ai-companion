@@ -30,3 +30,4 @@ console.log("无 Key 提示:", noKeyBody.includes("请先配置 API Key"));
 await page.getByRole("button", { name: "取消" }).click();
 console.log("JS 错误:", errors.length);
 await browser.close();
+

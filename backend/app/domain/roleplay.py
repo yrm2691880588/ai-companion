@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
@@ -30,6 +31,8 @@ from app.domain.companions import CompanionService, LLMClient
 from app.domain.quota import QuotaService
 from app.domain.usage import CallContext, aggregate_usage
 from app.infra.llm.types import Message, Role, TaskName, Usage
+
+_LOG = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +124,7 @@ class RunRecord:
     review: dict[str, object] | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
+    ulid: str = ""
 
 
 class ScenarioRepository(Protocol):
@@ -368,6 +372,7 @@ class RoleplayService:
             try:
                 profile_note = await self._profiles.prompt_for(user_id, run.companion_id)  # type: ignore[attr-defined]
             except Exception:
+                _LOG.warning("演练读取用户身份失败", exc_info=True)
                 profile_note = ""
         messages = [
             Message(

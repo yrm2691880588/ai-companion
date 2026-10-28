@@ -86,6 +86,7 @@ class MemoryRecord:
     quote: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_used_at: datetime | None = None
+    ulid: str = ""
 
 
 class MemoryRepository(Protocol):

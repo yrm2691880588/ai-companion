@@ -1,36 +1,16 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
 import { Link } from "react-router-dom";
-import { api } from "../api";
 import AdminSettingsCard from "../components/AdminSettingsCard";
 import ProviderSettingsList from "../components/ProviderSettingsList";
-import type { Provider, UsageSummary } from "../types";
+import VoiceSettingsCard from "../components/VoiceSettingsCard";
 
 export default function SettingsPage() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [error, setError] = useState("");
-
-  async function reload() {
-    try {
-      const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
-      setProviders(list);
-      setUsage(summary);
-    } catch (event) {
-      setError((event as Error).message);
-    }
-  }
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [list, summary] = await Promise.all([api.providers(), api.usage(7)]);
-        setProviders(list);
-        setUsage(summary);
-      } catch (event) {
-        setError((event as Error).message);
-      }
-    })();
-  }, []);
+  const providerQuery = useQuery(queries.providers());
+  const usageQuery = useQuery(queries.usage());
+  const providers = providerQuery.data ?? [];
+  const usage = usageQuery.data;
+  const error = providerQuery.error?.message || usageQuery.error?.message;
 
   return (
     <div>
@@ -48,8 +28,10 @@ export default function SettingsPage() {
 
       <AdminSettingsCard />
 
+      <VoiceSettingsCard />
+
       <h2 style={{ marginTop: 18 }}>供应商</h2>
-      <ProviderSettingsList providers={providers} onChanged={() => void reload()} />
+      <ProviderSettingsList providers={providers} />
       <h2 style={{ marginTop: 18 }}>最近 7 天用量</h2>
       {usage ? (
         <div className="card">
@@ -71,4 +53,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
 

@@ -480,11 +480,9 @@ label {
   align-items: center;
 }
 
+/* Radix 负责定位（Portal + side/align），这里只管外观 */
 .menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
-  min-width: 110px;
+  min-width: 120px;
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -492,12 +490,17 @@ label {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(44, 36, 48, 0.12);
-  z-index: 5;
+  box-shadow: 0 12px 30px rgba(44, 36, 48, 0.16);
+  z-index: 60;
+  animation: menu-pop 0.12s ease-out;
 }
 
-.menu a,
-.menu button {
+@keyframes menu-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-item {
   text-align: left;
   padding: 6px 10px;
   font-size: 13px;
@@ -505,6 +508,18 @@ label {
   border: 0;
   color: var(--text);
   border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.menu-item[data-highlighted] {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.menu-item.danger-text[data-highlighted] {
+  background: rgba(204, 51, 51, 0.1);
 }
 
 .menu a:hover,
@@ -516,22 +531,60 @@ label {
   color: var(--danger) !important;
 }
 
+/* Radix Overlay：只负责遮罩，定位交给下方的 .modal 包装层 */
 .modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(44, 36, 48, 0.35);
-  display: grid;
-  place-items: center;
-  padding: 16px;
   z-index: 50;
+  animation: modal-fade 0.14s ease-out;
 }
 
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Radix Content：自身固定居中，保留原有视觉 */
 .modal {
-  width: min(420px, 100%);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   background: var(--panel);
   border-radius: 16px;
   padding: 18px;
   box-shadow: 0 24px 60px rgba(44, 36, 48, 0.25);
+  z-index: 51;
+  animation: modal-pop 0.16s ease-out;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 关闭按钮（Radix 要求有无障碍关闭入口） */
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.modal-close:hover {
+  background: var(--panel-2);
+  color: var(--ink);
 }
 
 .skeleton-card {
@@ -652,17 +705,18 @@ label {
   line-height: 1.5;
 }
 
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  transform: translateX(-50%);
-  background: #2c2430;
-  color: #fff;
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  z-index: 60;
+[data-sonner-toaster] {
+  --normal-bg: var(--panel);
+  --normal-text: var(--text);
+  --normal-border: var(--line);
+  font-family: inherit;
+}
+
+[data-sonner-toast][data-styled="true"] {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+  border-radius: var(--radius);
 }
 
 .empty-chat {
@@ -730,20 +784,21 @@ label {
 }
 
 /* ---------- 头像裁剪 ---------- */
-.avatar-canvas {
+.avatar-crop-box {
+  position: relative;
   width: 256px;
   height: 256px;
-  border-radius: 50%;
-  display: block;
   margin: 12px auto;
+  border-radius: 50%;
+  overflow: hidden;
   background: var(--panel-2);
   border: 1px solid var(--line);
-  cursor: grab;
-  touch-action: none;
 }
 
-.avatar-canvas:active {
-  cursor: grabbing;
+/* 让 react-easy-crop 的圆形遮罩与主题色一致 */
+.avatar-crop-box .reactEasyCrop_CropArea {
+  border: 2px solid var(--accent);
+  color: rgba(0, 0, 0, 0.42);
 }
 
 /* ---------- 管理员参数表单 ---------- */
@@ -950,18 +1005,6 @@ label {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
-/* ---------- 聊天页头部更多菜单 ---------- */
-.header-menu {
-  top: calc(100% + 6px);
-  bottom: auto;
-  right: 0;
-  min-width: 140px;
-}
-
-.header-menu a {
-  padding: 8px 12px;
-}
-
 /* ---------- 模型搜索结果 ---------- */
 .discovered {
   border: 1px solid var(--line);
@@ -972,3 +1015,60 @@ label {
   max-height: 180px;
   overflow-y: auto;
 }
+
+/* ---------- 语音 ---------- */
+.voice-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger, #d33);
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.voice-timer {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.voice-meter {
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.voice-meter-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+.voice-error {
+  color: var(--danger, #c33);
+  font-size: 13px;
+}
+
+.voice-playing {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+
+

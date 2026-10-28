@@ -25,3 +25,18 @@ tmp/
 # 编辑器
 .vscode/
 .idea/
+
+# pip 安装临时目录（build/unpack/metadata 等）
+backend/pip-*/
+backend/tmps*/
+pip-*/
+
+
+# pytest 临时目录（跑测试会自动生成）
+backend/pytest-of-*/
+pytest-of-*/
+
+
+# pip 安装产生的元数据目录
+*.egg-info/
+

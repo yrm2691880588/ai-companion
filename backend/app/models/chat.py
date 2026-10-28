@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import new_ulid
 from app.models.base import Base, utcnow
 
 
@@ -59,6 +60,8 @@ class SessionSummary(Base):
     __tablename__ = "conversation_summaries"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ulid: Mapped[str] = mapped_column(String(26), default=new_ulid)
+    origin_device_id: Mapped[str | None] = mapped_column(String(64))
     session_id: Mapped[int] = mapped_column(
         ForeignKey("sessions.id", ondelete="CASCADE"), unique=True
     )

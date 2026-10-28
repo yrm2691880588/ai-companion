@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -14,6 +15,8 @@ from app.domain.persona import Persona, compile_prompt
 from app.domain.safety import assess_input
 from app.domain.usage import CallContext, aggregate_usage
 from app.infra.llm.types import Message, Role, TaskName, Usage
+
+_LOG = logging.getLogger(__name__)
 
 MAX_TRIAL_TURNS = 3
 MAX_TRIAL_SESSIONS = 200
@@ -102,6 +105,7 @@ class TrialService:
                         user_id, 0
                     )
                 except Exception:
+                    _LOG.warning("试聊读取用户身份失败", exc_info=True)
                     profile_note = ""
             system_prompt = compile_prompt(persona) + profile_note + SAFETY_NOTE
             assessment = assess_input(text)

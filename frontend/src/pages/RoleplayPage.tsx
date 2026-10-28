@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, streamEvents } from "../api";
-import type { Companion, Review, Run, Scenario } from "../types";
+import type { Review, Run } from "../lib/types";
 
 interface Line {
   id: number;
@@ -12,8 +14,10 @@ interface Line {
 export default function RoleplayPage() {
   const { id } = useParams();
   const companionId = Number(id);
-  const [companion, setCompanion] = useState<Companion | null>(null);
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const companionQuery = useQuery(queries.companion(companionId));
+  const scenariosQuery = useQuery(queries.scenarios());
+  const companion = companionQuery.data;
+  const scenarios = scenariosQuery.data ?? [];
   const [run, setRun] = useState<Run | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -21,21 +25,6 @@ export default function RoleplayPage() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [loaded, list] = await Promise.all([
-          api.companion(companionId),
-          api.scenarios(),
-        ]);
-        setCompanion(loaded);
-        setScenarios(list);
-      } catch (event) {
-        setError((event as Error).message);
-      }
-    })();
-  }, [companionId]);
 
   async function start(key: string) {
     setError("");
@@ -124,7 +113,7 @@ export default function RoleplayPage() {
         </Link>
       </div>
 
-      {error && <div className="alert">{error}</div>}
+      {(error || companionQuery.error || scenariosQuery.error) && <div className="alert">{error || companionQuery.error?.message || scenariosQuery.error?.message}</div>}
 
       {!run && (
         <div className="grid" style={{ marginTop: 12 }}>
@@ -270,3 +259,4 @@ function labelOf(key: string): string {
   };
   return labels[key] ?? key;
 }
+

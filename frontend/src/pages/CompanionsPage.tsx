@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
-import { downloadPersona } from "../components/PersonaImport";
-import type { Companion, Latest } from "../types";
+import Menu from "../components/Menu";
+import Modal from "../components/Modal";
+import { downloadPersona } from "../lib/persona-export";
+import type { Companion } from "../lib/types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -41,11 +45,16 @@ function relativeTime(iso?: string | null): string {
 }
 
 export default function CompanionsPage() {
-  const [items, setItems] = useState<Companion[]>([]);
-  const [latests, setLatests] = useState<Record<number, Latest>>({});
+  const client = useQueryClient();
+  const listQuery = useQuery(queries.companions());
+  const items = listQuery.data ?? [];
+  const latestQueries = useQueries({ queries: items.map(item => queries.latest(item.id)) });
+  const latests = Object.fromEntries(items.map((item, index) => [item.id, latestQueries[index].data]));
+  const loading = listQuery.isPending;
+  const loadError = listQuery.error?.message || latestQueries.find(query => query.error)?.error?.message;
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [menuId, setMenuId] = useState<number | null>(null);
+  const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState<Companion | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -54,24 +63,10 @@ export default function CompanionsPage() {
   const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  async function reload() {
-    try {
-      const list = await api.companions();
-      setItems(list);
-      const entries = await Promise.all(
-        list.map(async (item) => [item.id, await api.latest(item.id)] as const),
-      );
-      setLatests(Object.fromEntries(entries));
-    } catch (event) {
-      setError((event as Error).message);
-    } finally {
-      setLoading(false);
-    }
+  function updateCompanion(updated: Companion) {
+    client.setQueryData(queries.companion(updated.id).queryKey, updated);
+    client.setQueryData(queries.companions().queryKey, (old) => old?.map(item => item.id === updated.id ? updated : item));
   }
-
-  useEffect(() => {
-    void reload();
-  }, []);
 
   function askDelete(item: Companion) {
     setMenuId(null);
@@ -107,7 +102,7 @@ export default function CompanionsPage() {
     if (!avatarTarget) return;
     try {
       const updated = await api.setAvatar(avatarTarget, dataUrl);
-      setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      updateCompanion(updated);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -119,7 +114,7 @@ export default function CompanionsPage() {
   async function clearAvatar(item: Companion) {
     try {
       const updated = await api.setAvatar(item.id, null);
-      setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      updateCompanion(updated);
       setMenuId(null);
     } catch (err) {
       setError((err as Error).message);
@@ -136,7 +131,9 @@ export default function CompanionsPage() {
     try {
       await api.deleteCompanion(deleteTarget.id, deleteTarget.name);
       setDeleteTarget(null);
-      await reload();
+      client.removeQueries({ queryKey: queries.companion(deleteTarget.id).queryKey });
+      client.removeQueries({ queryKey: queries.latest(deleteTarget.id).queryKey });
+      await client.invalidateQueries({ queryKey: queries.companions().queryKey });
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -156,7 +153,7 @@ export default function CompanionsPage() {
         </Link>
       </div>
 
-      {error && <div className="alert">{error}</div>}
+      {(error || loadError) && <div className="alert">{error || loadError}</div>}
       {loading ? (
         <div className="grid" style={{ marginTop: 16 }}>
           {[0, 1].map((key) => (
@@ -167,7 +164,7 @@ export default function CompanionsPage() {
             </div>
           ))}
         </div>
-      ) : items.length === 0 ? (
+      ) : listQuery.isError ? null : items.length === 0 ? (
         <div className="card empty-card" style={{ marginTop: 16 }}>
           <h3>还没有伴侣</h3>
           <p className="muted">用一句话描述你想要的人，或从 5 类官方模板开始。</p>
@@ -220,28 +217,54 @@ export default function CompanionsPage() {
                   <Link className="btn primary" to={`/companions/${item.id}/chat`}>
                     {latest?.content ? "继续聊" : "开始聊天"}
                   </Link>
-                  <button
-                    className="btn ghost"
-                    onClick={() => setMenuId(menuId === item.id ? null : item.id)}
-                  >
-                    更多
-                  </button>
-                  {menuId === item.id && (
-                    <div className="menu">
-                      <Link to={`/companions/${item.id}/persona`}>人设</Link>
-                      <button className="link" onClick={() => downloadPersona(item)}>导出人设</button>
-                      <Link to={`/companions/${item.id}/memories`}>记忆</Link>
-                      <Link to={`/companions/${item.id}/roleplay`}>演练</Link>
-                      {item.avatar && (
-                        <button className="link" onClick={() => void clearAvatar(item)}>
-                          清除头像
-                        </button>
-                      )}
-                      <button className="link danger-text" onClick={() => askDelete(item)}>
-                        删除
+                  <Menu
+                    triggerLabel={`${item.name} 的更多操作`}
+                    open={menuId === item.id}
+                    onOpenChange={(open) => setMenuId(open ? item.id : null)}
+                    trigger={
+                      <button className="btn ghost" onClick={() => setMenuId(item.id)}>
+                        更多
                       </button>
-                    </div>
-                  )}
+                    }
+                    items={[
+                      {
+                        key: "persona",
+                        label: "人设",
+                        onSelect: () => navigate(`/companions/${item.id}/persona`),
+                      },
+                      {
+                        key: "export",
+                        label: "导出人设",
+                        onSelect: () => downloadPersona(item),
+                      },
+                      {
+                        key: "memories",
+                        label: "记忆",
+                        onSelect: () => navigate(`/companions/${item.id}/memories`),
+                      },
+                      {
+                        key: "roleplay",
+                        label: "演练",
+                        onSelect: () => navigate(`/companions/${item.id}/roleplay`),
+                      },
+                      ...(item.avatar
+                        ? [
+                            {
+                              key: "clear-avatar",
+                              label: "清除头像",
+                              onSelect: () => void clearAvatar(item),
+                            },
+                          ]
+                        : []),
+                      {
+                        key: "delete",
+                        label: "删除",
+                        danger: true,
+                        opensModal: true,
+                        onSelect: () => askDelete(item),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
             );
@@ -267,19 +290,14 @@ export default function CompanionsPage() {
       />
 
       {deleteTarget && (
-        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h2>删除「{deleteTarget.name}」</h2>
-            <p className="muted">
-              会一并删除她的会话、记忆与演练记录，且不可恢复。请输入名字确认：
-            </p>
-            <input
-              value={deleteName}
-              autoFocus
-              placeholder={deleteTarget.name}
-              onChange={(event) => setDeleteName(event.target.value)}
-            />
-            <div className="toolbar">
+        <Modal
+          open
+          onClose={() => !deleting && setDeleteTarget(null)}
+          title={`删除「${deleteTarget.name}」`}
+          description="会一并删除她的会话、记忆与演练记录，且不可恢复。请输入名字确认："
+          preventClose={deleting}
+          footer={
+            <>
               <button
                 className="danger"
                 disabled={deleting || deleteName.trim() !== deleteTarget.name}
@@ -290,13 +308,24 @@ export default function CompanionsPage() {
               <button className="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
                 取消
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <input
+            value={deleteName}
+            autoFocus
+            placeholder={deleteTarget.name}
+            onChange={(event) => setDeleteName(event.target.value)}
+          />
+        </Modal>
       )}
     </div>
   );
 }
+
+
+
+
 
 
 

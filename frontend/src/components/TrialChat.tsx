@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { api } from "../api";
-import type { Persona } from "../types";
+import Modal from "./Modal";
+import type { Persona } from "../lib/types";
 
 interface Props {
   persona: Persona;
@@ -83,50 +84,52 @@ export default function TrialChat({ persona, onClose }: Props) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal trial-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <h2>先和她聊两句</h2>
-          <span className="muted">已聊 {userTurns}/3 轮</span>
-        </div>
-        <p className="muted">这里只是试聊，不会保存到正式会话，也不会产生记忆。</p>
+    <Modal
+      open
+      onClose={onClose}
+      title="先和她聊两句"
+      className="trial-modal"
+      footer={
+        <button className="ghost" onClick={onClose}>
+          关闭
+        </button>
+      }
+    >
+      <p className="muted">
+        这里只是试聊，不会保存到正式会话，也不会产生记忆。已聊 {userTurns}/3 轮
+      </p>
 
-        {error && <div className="alert">{error}</div>}
+      {error && <div className="alert">{error}</div>}
 
-        <div className="trial-messages">
-          {turns.length === 0 && <p className="muted">说一句试试，看她像不像你想要的人。</p>}
-          {turns.map((turn, index) => (
-            <div key={index} className={`bubble ${turn.role}`}>
-              {turn.content || (busy && index === turns.length - 1 ? "…" : "")}
-            </div>
-          ))}
-        </div>
-
-        <div className="composer">
-          <textarea
-            rows={1}
-            value={draft}
-            disabled={busy || limitReached}
-            placeholder={limitReached ? "试聊已满 3 轮，去创建她继续聊" : "说点什么…"}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                void send();
-              }
-            }}
-          />
-          <button className="primary" disabled={busy || limitReached} onClick={() => void send()}>
-            {busy ? "…" : "发送"}
-          </button>
-        </div>
-
-        <div className="toolbar">
-          <button className="ghost" onClick={onClose}>
-            关闭
-          </button>
-        </div>
+      <div className="trial-messages">
+        {turns.length === 0 && <p className="muted">说一句试试，看她像不像你想要的人。</p>}
+        {turns.map((turn, index) => (
+          <div key={index} className={`bubble ${turn.role}`}>
+            {turn.content || (busy && index === turns.length - 1 ? "…" : "")}
+          </div>
+        ))}
       </div>
-    </div>
+
+      <div className="composer">
+        <textarea
+          rows={1}
+          value={draft}
+          disabled={busy || limitReached}
+          placeholder={limitReached ? "试聊已满 3 轮，去创建她继续聊" : "说点什么…"}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <button className="primary" disabled={busy || limitReached} onClick={() => void send()}>
+          {busy ? "…" : "发送"}
+        </button>
+      </div>
+    </Modal>
   );
 }
+
+

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.device import current_device_id
 from app.core.ids import new_ulid
 from app.domain.companions import CompanionRecord
 from app.domain.persona import Persona
@@ -41,7 +42,7 @@ class SqlCompanionRepository:
                 current_version=1,
                 memory_enabled=True,
                 ulid=new_ulid(),
-                origin_device_id="local",
+                origin_device_id=current_device_id(),
                 derived_from=derived_from,
             )
             session.add(companion)
@@ -53,7 +54,7 @@ class SqlCompanionRepository:
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
                     ulid=new_ulid(),
-                    origin_device_id="local",
+                    origin_device_id=current_device_id(),
                 )
             )
             await session.commit()
@@ -66,7 +67,10 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=True,
                 avatar=companion.avatar,
+                ulid=companion.ulid,
                 derived_from=companion.derived_from,
+                voice_id=companion.voice_id,
+                voice_params=companion.voice_params,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at or datetime.now(UTC),
             )
@@ -131,7 +135,7 @@ class SqlCompanionRepository:
                     persona=persona.model_dump(mode="json"),
                     compiled_prompt=compiled_prompt,
                     ulid=new_ulid(),
-                    origin_device_id="local",
+                    origin_device_id=current_device_id(),
                 )
             )
             companion.current_version = version
@@ -147,7 +151,10 @@ class SqlCompanionRepository:
                 compiled_prompt=compiled_prompt,
                 memory_enabled=companion.memory_enabled,
                 avatar=companion.avatar,
+                ulid=companion.ulid,
                 derived_from=companion.derived_from,
+                voice_id=companion.voice_id,
+                voice_params=companion.voice_params,
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at,
             )
@@ -207,6 +214,26 @@ class SqlCompanionRepository:
             await session.commit()
             return await self.get(user_id, companion_id)
 
+    async def set_voice(
+        self, user_id: str, companion_id: int, voice_id: str | None
+    ) -> CompanionRecord | None:
+        async with self._session_factory() as session:
+            companion = (
+                await session.execute(
+                    select(Companion).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if companion is None:
+                return None
+            companion.voice_id = voice_id
+            companion.updated_at = datetime.now(UTC)
+            await session.commit()
+            return await self.get(user_id, companion_id)
+
 
 def _to_record(companion: Companion, persona_row: CompanionPersona) -> CompanionRecord:
     persona = Persona.model_validate(persona_row.persona)
@@ -219,7 +246,10 @@ def _to_record(companion: Companion, persona_row: CompanionPersona) -> Companion
         compiled_prompt=persona_row.compiled_prompt,
         memory_enabled=companion.memory_enabled,
         avatar=companion.avatar,
+        ulid=companion.ulid,
         derived_from=companion.derived_from,
+        voice_id=companion.voice_id,
+        voice_params=companion.voice_params,
         created_at=companion.created_at,
         updated_at=companion.updated_at,
     )

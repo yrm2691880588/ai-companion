@@ -1,4 +1,4 @@
-﻿# 一键启动 AI 伴侣系统：检查数据库、确保前端已构建、启动后端、自动打开页面。
+# 一键启动 AI 伴侣系统：检查数据库、确保前端已构建、启动后端、自动打开页面。
 # 双击仓库根目录的「启动AI伴侣.bat」即可；关闭窗口即停止后端。
 
 param(
@@ -111,7 +111,24 @@ try {
     }
 
     Write-Section '启动后端'
-    & $Python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+    # 是否允许局域网访问（手机/PWA）：由 .env 里的 AI_COMPANION_LISTEN_LAN 决定
+    $ListenLan = $false
+    $EnvFile = Join-Path $Root '.env'
+    if (Test-Path $EnvFile) {
+        $line = Select-String -Path $EnvFile -Pattern '^\s*AI_COMPANION_LISTEN_LAN\s*=\s*(.+)$' |
+            Select-Object -First 1
+        if ($line -and $line.Matches[0].Groups[1].Value.Trim() -match '^(true|1|yes|on)$') {
+            $ListenLan = $true
+        }
+    }
+    if ($ListenLan) {
+        Write-Host '   监听 0.0.0.0：同一局域网内的手机可访问（请在 .env 配置 CORS 来源）' -ForegroundColor Yellow
+        $BindHost = '0.0.0.0'
+    } else {
+        Write-Host '   监听 127.0.0.1：仅本机可访问（需要手机访问请设置 AI_COMPANION_LISTEN_LAN=true）' -ForegroundColor DarkGray
+        $BindHost = '127.0.0.1'
+    }
+    & $Python -m uvicorn app.main:app --host $BindHost --port 8000
 } finally {
     Pop-Location
     Get-Job | Stop-Job -ErrorAction SilentlyContinue

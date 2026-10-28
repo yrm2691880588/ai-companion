@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -30,6 +31,8 @@ from app.domain.usage import CallContext, aggregate_usage
 from app.infra.llm.tokenizer import estimate_tokens
 from app.infra.llm.types import ChatChunk, Message, Role, TaskName, Usage
 from app.infra.summary_repo import SummaryRepository
+
+_LOG = logging.getLogger(__name__)
 
 MAX_HISTORY_MESSAGES = 30
 MAX_MESSAGE_CHARS = 2000
@@ -83,6 +86,7 @@ class SessionRecord:
     state: str = "active"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_message_at: datetime | None = None
+    ulid: str = ""
 
 
 @dataclass(slots=True)
@@ -94,6 +98,7 @@ class MessageRecord:
     content: str
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     client_request_id: str | None = None
+    ulid: str = ""
 
 
 class ChatRepository(Protocol):
@@ -433,6 +438,8 @@ class ChatService:
             try:
                 profile_note = await self._profiles.prompt_for(user_id, companion.id)  # type: ignore[attr-defined]
             except Exception:
+                # 用户身份读取失败不该阻断对话，但必须留痕
+                _LOG.warning("读取用户身份失败 companion_id=%s", companion.id, exc_info=True)
                 profile_note = ""
         prompt = (
             companion.compiled_prompt + profile_note + OPENERS_NOTE.format(time_hint=time_hint(now))
@@ -452,6 +459,7 @@ class ChatService:
                 if chunk.delta:
                     collected += chunk.delta
         except Exception:
+            _LOG.warning("生成开场白失败，退回模板开场白", exc_info=True)
             collected = ""
         text = collected.strip() or self._fallback_opener(companion)
         message = await self._repo.append_message(user_id, session.id, "assistant", text)
@@ -488,6 +496,8 @@ class ChatService:
             try:
                 profile_note = await self._profiles.prompt_for(user_id, companion.id)  # type: ignore[attr-defined]
             except Exception:
+                # 用户身份读取失败不该阻断对话，但必须留痕
+                _LOG.warning("读取用户身份失败 companion_id=%s", companion.id, exc_info=True)
                 profile_note = ""
         prompt = companion.compiled_prompt + profile_note + SAFETY_NOTE
         if crisis:
@@ -499,6 +509,7 @@ class ChatService:
             try:
                 memories = await self._memory.recall(user_id, companion.id, query, limit=6)
             except Exception:
+                _LOG.warning("召回记忆失败，本轮不带记忆", exc_info=True)
                 memories = []
             recalled = [item.content for item in memories[:2]]
             prompt += format_for_prompt(memories)
@@ -579,7 +590,7 @@ class ChatService:
                     user_id, session_id, assessment.level, assessment.keywords
                 )
             except Exception:
-                pass  # 留痕失败不影响对话
+                _LOG.warning("安全事件留痕失败", exc_info=True)
 
         history = await self._repo.list_messages(user_id, session_id, limit=MAX_HISTORY_MESSAGES)
         system_prompt, kept_messages, recalled = await self._build_context(

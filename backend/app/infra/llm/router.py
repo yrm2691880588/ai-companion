@@ -106,6 +106,7 @@ class ModelRouter:
         try:
             override = self._overrides(task_key)
         except Exception:
+            _LOG.warning("读取管理员模型覆盖失败 task=%s", task_key, exc_info=True)
             override = None
         if not override:
             return calls

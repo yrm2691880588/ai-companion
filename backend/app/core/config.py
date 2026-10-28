@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     # 密钥：32 字节的 base64（或 64 位 hex），用于信封加密供应商 API Key
     master_key: str = ""
 
-    # 开发期鉴权占位：生产必须关闭
-    debug_auth: bool = True
+    # 开发期鉴权占位：允许 X-User-Id 头冒充用户。
+    # 安全默认关闭；只有本地调试才显式打开（.env 里设 true）。
+    debug_auth: bool = False
     debug_user_id: str = "dev-user"
 
     # 本地模型：是否允许访问 localhost / 私有网段（单机自用模式打开，公网多用户模式关闭）
@@ -55,8 +56,20 @@ class Settings(BaseSettings):
     # 本地单用户模式（开源默认）：没有账号、没有管理员
     local_mode: bool = True
     local_user_id: str = "local-user"
+    # 语音音频临时目录；留空则用系统临时目录
+    audio_dir: str = ""
+    # 允许跨端访问的来源（逗号分隔）；留空=只允许同源访问
+    # 手机端/PWA 直连本机后端时需要填实际来源，例如 http://192.168.1.10:8000
+    cors_origins: str = ""
+    # 是否监听局域网（true=0.0.0.0，手机可访问；false=仅本机）。
+    # 由 scripts/start.ps1 读取并决定 uvicorn 的 --host；应用本身不消费此值。
+    listen_lan: bool = False
     # 前端构建产物目录；留空则用仓库下的 frontend/dist
     frontend_dist: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     @property
     def admin_phone_set(self) -> set[str]:

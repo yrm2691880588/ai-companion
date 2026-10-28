@@ -7,7 +7,9 @@ from app.main import create_app
 
 
 def client() -> TestClient:
-    return TestClient(create_app(Settings(local_mode=False, env="test", _env_file=None)))  # type: ignore[call-arg]
+    return TestClient(
+        create_app(Settings(local_mode=False, debug_auth=True, env="test", _env_file=None))
+    )  # type: ignore[call-arg]
 
 
 def test_record_known_event() -> None:

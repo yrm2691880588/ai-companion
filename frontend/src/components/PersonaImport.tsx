@@ -1,25 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import Modal from "./Modal";
 import PersonaForm from "./PersonaForm";
-import type { Companion, Persona } from "../types";
+import { personaSchema } from "../lib/forms";
+import type { Companion, Persona } from "../lib/types";
 
-export function downloadPersona(companion: Companion): void {
-  const payload = {
-    format: "ai-companion-persona",
-    version: 1,
-    exported_at: new Date().toISOString(),
-    persona: companion.persona,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${companion.name}-人设.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
 
 interface Props {
   onCreated: (companion: Companion) => void;
@@ -55,18 +40,22 @@ export default function PersonaImportButton({ onCreated }: Props) {
         throw new Error("文件里没有找到人设（persona）");
       }
       // 先预览，不创建
-      setDraft(parsed.persona as Persona);
+      const validated = personaSchema.safeParse(parsed.persona);
+      if (!validated.success) {
+        setError(validated.error.issues.map(item => `${item.path.join(".")}：${item.message}`).join("；"));
+        return;
+      }
+      setDraft(validated.data);
     } catch (err) {
       setError((err as Error).message);
     }
   }
 
-  async function create() {
-    if (!draft) return;
+  async function create(persona: Persona) {
     setBusy(true);
     setError("");
     try {
-      const created = await api.importPersona(draft);
+      const created = await api.importPersona(persona);
       setDraft(null);
       onCreated(created);
     } catch (err) {
@@ -91,28 +80,33 @@ export default function PersonaImportButton({ onCreated }: Props) {
       {error && <span className="muted"> {error}</span>}
 
       {draft && (
-        <div className="modal-backdrop" onClick={() => !busy && setDraft(null)}>
-          <div className="modal import-modal" onClick={(event) => event.stopPropagation()}>
-            <h2>预览导入的人设</h2>
-            <p className="muted">
-              这是文件里的内容。可以直接修改，确认后才会创建新伴侣；关闭不会保存。
-            </p>
-            {error && <div className="alert">{error}</div>}
-            <div className="import-form">
-              <PersonaForm value={draft} onChange={setDraft} disabled={busy} />
-            </div>
-            <div className="toolbar">
-              <button className="primary" disabled={busy} onClick={() => void create()}>
+        <Modal
+          open
+          onClose={() => !busy && setDraft(null)}
+          title="预览导入的人设"
+          description="这是文件里的内容。可以直接修改，确认后才会创建新伴侣；关闭不会保存。"
+          preventClose={busy}
+          className="import-modal"
+          footer={
+            <>
+              <button className="primary" disabled={busy} type="submit" form="import-persona">
                 {busy ? "创建中…" : "用这版人设创建伴侣"}
               </button>
               <button className="ghost" disabled={busy} onClick={() => setDraft(null)}>
                 取消
               </button>
-            </div>
+            </>
+          }
+        >
+          {error && <div className="alert">{error}</div>}
+          <div className="import-form">
+            <PersonaForm formId="import-persona" value={draft} onSubmit={create} disabled={busy} />
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
 }
+
+
 

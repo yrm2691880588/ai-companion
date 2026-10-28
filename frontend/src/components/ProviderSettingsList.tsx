@@ -1,38 +1,42 @@
-import { useEffect, useState } from "react";
+import type { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { providerSchema } from "../lib/forms";
+import FieldError from "./FieldError";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queries } from "../lib/queries";
+import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../api";
-import type { DiscoveredModel, Provider, ProviderSetting } from "../types";
+import Modal from "./Modal";
+import type { DiscoveredModel, Provider } from "../lib/types";
 
 interface Props {
   providers: Provider[];
-  onChanged: () => void;
 }
 
-export default function ProviderSettingsList({ providers, onChanged }: Props) {
-  const [settings, setSettings] = useState<Record<string, ProviderSetting>>({});
+export default function ProviderSettingsList({ providers }: Props) {
+  const client = useQueryClient();
+  const settingsQuery = useQuery(queries.providerSettings());
+  const settings = Object.fromEntries((settingsQuery.data ?? []).map(item => [item.provider_key, item]));
   const [editing, setEditing] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [enabled, setEnabled] = useState(true);
+  const { register, reset, handleSubmit, formState: { errors } } = useForm<z.infer<typeof providerSchema>>({
+    resolver: zodResolver(providerSchema), defaultValues: { apiKey: "", baseUrl: "", enabled: true }, mode: "onBlur",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
   const [discovered, setDiscovered] = useState<DiscoveredModel[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
   const [probeResult, setProbeResult] = useState("");
 
-  async function reload() {
-    try {
-      const list = await api.providerSettings();
-      setSettings(Object.fromEntries(list.map((item) => [item.provider_key, item])));
-    } catch (event) {
-      setError((event as Error).message);
-    }
+  async function refreshSettings() {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queries.providerSettings().queryKey }),
+      client.invalidateQueries({ queryKey: queries.providers().queryKey }),
+      client.invalidateQueries({ queryKey: queries.admin().queryKey }),
+    ]);
   }
-
-  useEffect(() => {
-    void reload();
-  }, []);
 
   function startEdit(provider: Provider) {
     const setting = settings[provider.key];
@@ -40,14 +44,11 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
     setDiscovered([]);
     setDiscoverError("");
     setProbeResult("");
-    setApiKey("");
-    setBaseUrl(setting?.base_url ?? provider.base_url);
-    setEnabled(setting?.enabled ?? true);
+    reset({ apiKey: "", baseUrl: setting?.base_url ?? provider.base_url, enabled: setting?.enabled ?? true });
     setError("");
-    setSaved("");
   }
 
-  async function save() {
+  async function save({ apiKey, baseUrl, enabled }: z.infer<typeof providerSchema>) {
     if (!editing) return;
     setBusy(true);
     setError("");
@@ -57,11 +58,9 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
         base_url: baseUrl.trim() || null,
         enabled,
       });
-      await reload();
+      await refreshSettings();
       setEditing(null);
-      setSaved("已保存，立即生效");
-      window.setTimeout(() => setSaved(""), 2000);
-      onChanged();
+      toast.success("已保存，立即生效", { id: "provider-saved" });
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -88,8 +87,8 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
         editing,
         discovered.map((model) => model.id),
       );
-      setSaved("已加入模型列表，可在上方下拉中选择");
-      window.setTimeout(() => setSaved(""), 2500);
+      await refreshSettings();
+      toast.success("已加入模型列表，可在上方下拉中选择", { id: "models-imported" });
     } catch (event) {
       setDiscoverError((event as Error).message);
     } finally {
@@ -115,8 +114,7 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
     setBusy(true);
     try {
       await api.saveProviderSetting(providerKey, { api_key: "" });
-      await reload();
-      onChanged();
+      await refreshSettings();
     } catch (event) {
       setError((event as Error).message);
     } finally {
@@ -126,8 +124,7 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
 
   return (
     <div>
-      {error && <div className="alert">{error}</div>}
-      {saved && <div className="notice">{saved}</div>}
+      {(error || settingsQuery.error) && <div className="alert">{error || settingsQuery.error?.message}</div>}
       <p className="muted">
         点击供应商卡片配置 API Key 与地址。Key 只保存在本机，加密存储，不会显示明文。
       </p>
@@ -170,79 +167,84 @@ export default function ProviderSettingsList({ providers, onChanged }: Props) {
       </div>
 
       {editing && (
-        <div className="modal-backdrop" onClick={() => !busy && setEditing(null)}>
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <h2>配置供应商</h2>
-            <p className="muted">
-              只保存在本机；保存后立即生效，不需要重启。
-            </p>
-            {error && <div className="alert">{error}</div>}
-            <label htmlFor="provider-key">API Key</label>
-            <input
-              id="provider-key"
-              value={apiKey}
-              placeholder="留空则不修改现有 Key"
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <div className="toolbar" style={{ marginTop: 8 }}>
-              <button className="ghost" disabled={discovering} onClick={() => void discover()}>
-                {discovering ? "搜索中…" : "搜索该供应商的可用模型"}
-              </button>
-              <button className="ghost" onClick={() => void probe()}>
-                测试连接
-              </button>
-            </div>
-            {probeResult && <div className="notice">{probeResult}</div>}
-            {discoverError && <div className="alert">{discoverError}</div>}
-            {discovered.length > 0 && (
-              <div className="discovered">
-                <p className="muted">
-                  找到 {discovered.length} 个模型（点击下方按钮加入本机模型列表）：
-                </p>
-                <div>
-                  {discovered.map((model) => (
-                    <span className="tag" key={model.id} title={model.owned_by}>
-                      {model.id}
-                    </span>
-                  ))}
-                </div>
-                <div className="toolbar">
-                  <button className="primary" disabled={discovering} onClick={() => void importAll()}>
-                    全部加入模型列表
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <label htmlFor="provider-url">Base URL</label>
-            <input
-              id="provider-url"
-              value={baseUrl}
-              placeholder="https://api.example.com/v1"
-              onChange={(event) => setBaseUrl(event.target.value)}
-            />
-            <label className="muted" style={{ display: "block", marginTop: 10 }}>
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(event) => setEnabled(event.target.checked)}
-              />{" "}
-              启用这个供应商
-            </label>
-            <div className="toolbar">
-              <button className="primary" disabled={busy} onClick={() => void save()}>
+        <Modal
+          open
+          onClose={() => !busy && setEditing(null)}
+          title="配置供应商"
+          description="只保存在本机；保存后立即生效，不需要重启。"
+          preventClose={busy}
+          footer={
+            <>
+              <button className="primary" disabled={busy} type="submit" form="provider-settings">
                 {busy ? "保存中…" : "保存"}
               </button>
               <button className="ghost" disabled={busy} onClick={() => setEditing(null)}>
                 取消
               </button>
-            </div>
+            </>
+          }
+        >
+          <form id="provider-settings" noValidate onSubmit={handleSubmit(save)}>
+          {(error || settingsQuery.error) && <div className="alert">{error || settingsQuery.error?.message}</div>}
+          <label htmlFor="provider-key">API Key</label>
+          <input
+            id="provider-key"
+            {...register("apiKey")} aria-invalid={!!errors.apiKey} aria-describedby="provider-apiKey-error"
+            placeholder="留空则不修改现有 Key"
+          />
+          <FieldError id="provider-apiKey-error" error={errors.apiKey} />
+          <div className="toolbar" style={{ marginTop: 8 }}>
+            <button type="button" className="ghost" disabled={discovering} onClick={() => void discover()}>
+              {discovering ? "搜索中…" : "搜索该供应商的可用模型"}
+            </button>
+            <button type="button" className="ghost" onClick={() => void probe()}>
+              测试连接
+            </button>
           </div>
-        </div>
+          {probeResult && <div className="notice">{probeResult}</div>}
+          {discoverError && <div className="alert">{discoverError}</div>}
+          {discovered.length > 0 && (
+            <div className="discovered">
+              <p className="muted">
+                找到 {discovered.length} 个模型（点击下方按钮加入本机模型列表）：
+              </p>
+              <div>
+                {discovered.map((model) => (
+                  <span className="tag" key={model.id} title={model.owned_by}>
+                    {model.id}
+                  </span>
+                ))}
+              </div>
+              <div className="toolbar">
+                <button type="button" className="primary" disabled={discovering} onClick={() => void importAll()}>
+                  全部加入模型列表
+                </button>
+              </div>
+            </div>
+          )}
+
+          <label htmlFor="provider-url">Base URL</label>
+          <input
+            id="provider-url"
+            {...register("baseUrl")} aria-invalid={!!errors.baseUrl} aria-describedby="provider-baseUrl-error"
+            placeholder="https://api.example.com/v1"
+          />
+          <FieldError id="provider-baseUrl-error" error={errors.baseUrl} />
+          <label className="muted" style={{ display: "block", marginTop: 10 }}>
+            <input
+              type="checkbox"
+              {...register("enabled")}
+            />{" "}
+            启用这个供应商
+          </label>
+          </form>
+        </Modal>
       )}
     </div>
   );
 }
+
+
 
 
 
