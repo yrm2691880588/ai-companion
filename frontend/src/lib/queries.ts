@@ -36,4 +36,5 @@ export const queries = {
   profile: () => queryOptions({ queryKey: key("profile"), queryFn: ({ signal }) => api.getProfile(signal) }),
   companionProfile: (id: number) => queryOptions({ queryKey: key("companion-profile", id), queryFn: ({ signal }) => api.getCompanionProfile(id, signal) }),
   admin: () => queryOptions({ queryKey: key("admin"), queryFn: ({ signal }) => api.adminSettings(signal) }),
+  systemInfo: () => queryOptions({ queryKey: key("system-info"), queryFn: ({ signal }) => api.systemInfo(signal) }),
 };

@@ -4,6 +4,8 @@ import type {
   Account,
   AdminSettings,
   AdminSettingsResponse,
+  SystemInfo,
+  UpdateCheck,
   Companion,
   CompanionUserProfile,
   DiscoveredModel,
@@ -393,6 +395,12 @@ export const api = {
   },
   async quota(): Promise<Quota> {
     return request<Quota>("/v1/me/quota");
+  },
+  async systemInfo(signal?: AbortSignal): Promise<SystemInfo> {
+    return request<SystemInfo>("/v1/system/info", { signal });
+  },
+  async updateCheck(signal?: AbortSignal): Promise<UpdateCheck> {
+    return request<UpdateCheck>("/v1/system/update-check", { signal });
   },
   async adminSettings(signal?: AbortSignal): Promise<AdminSettingsResponse> {
     return request<AdminSettingsResponse>("/v1/admin/settings", { signal });

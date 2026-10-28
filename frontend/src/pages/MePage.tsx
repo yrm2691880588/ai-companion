@@ -7,8 +7,10 @@ import UserProfileForm from "../components/UserProfileForm";
 export default function MePage() {
   const providerQuery = useQuery(queries.providers());
   const usageQuery = useQuery(queries.usage());
+  const infoQuery = useQuery(queries.systemInfo());
   const providers = providerQuery.data ?? [];
   const usage = usageQuery.data;
+  const info = infoQuery.data;
   const error = providerQuery.error?.message || usageQuery.error?.message;
 
   return (
@@ -68,7 +70,15 @@ export default function MePage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <h2>关于</h2>
-        <p className="muted">AI 伴侣系统 v0.1.0 · 本地开源版，数据只存在本机。</p>
+        <p className="muted">
+          AI 伴侣系统 v{info?.version ?? "…"} · 本地开源版，数据只存在本机。
+        </p>
+        {info && (
+          <p className="muted">
+            数据库迁移 {info.migration_head}
+            {info.local_mode ? " · 本地单用户模式" : ""}
+          </p>
+        )}
         <p className="muted">遇到危机时，请拨打全国心理援助热线 12356，紧急情况拨打 120。</p>
       </div>
     </div>

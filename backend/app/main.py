@@ -28,6 +28,7 @@ from app.api.v1.personas import router as personas_router
 from app.api.v1.provider_settings import router as provider_settings_router
 from app.api.v1.quota import router as quota_router
 from app.api.v1.roleplay import router as roleplay_router
+from app.api.v1.system import router as system_router
 from app.api.v1.templates import router as templates_router
 from app.api.v1.trial import router as trial_router
 from app.api.v1.usage import router as usage_router
@@ -36,6 +37,7 @@ from app.api.v1.voice import router as voice_router
 from app.core.config import Settings, get_settings
 from app.core.device import DEVICE_HEADER, device_scope
 from app.core.errors import AppError
+from app.core.version import app_version
 from app.domain.auth import AuthRepository, AuthService
 from app.domain.chat import ChatRepository, ChatService, ChatStreamer
 from app.domain.companions import CompanionRepository, CompanionService, LLMClient
@@ -273,7 +275,7 @@ def create_app(
         yield
         await engine.dispose()
 
-    app = FastAPI(title="AI 伴侣系统 API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="AI 伴侣系统 API", version=app_version(), lifespan=lifespan)
     # 跨端访问：手机/PWA 直连本机后端时需要 CORS；默认只允许同源
     if resolved.cors_origin_list:
         app.add_middleware(
@@ -365,6 +367,7 @@ def create_app(
     app.include_router(provider_settings_router)
     app.include_router(persona_transfer_router)
     app.include_router(companions_router)
+    app.include_router(system_router)
     app.include_router(templates_router)
     app.include_router(trial_router)
     app.include_router(analytics_router)

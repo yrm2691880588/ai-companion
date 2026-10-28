@@ -269,3 +269,19 @@ export interface VoiceSynthesis {
   audio_url: string;
   expires_in: number;
 }
+
+export interface SystemInfo {
+  version: string;
+  migration_head: string;
+  local_mode: boolean;
+  update_feed_configured: boolean;
+}
+
+export interface UpdateCheck {
+  checked: boolean;
+  reason: string;
+  current: string;
+  latest: string | null;
+  update_available: boolean;
+  url?: string | null;
+}

@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     # 是否监听局域网（true=0.0.0.0，手机可访问；false=仅本机）。
     # 由 scripts/start.ps1 读取并决定 uvicorn 的 --host；应用本身不消费此值。
     listen_lan: bool = False
+    # 更新检查地址（GitHub Release API 等）；留空则不联网检查
+    update_feed: str = ""
     # 前端构建产物目录；留空则用仓库下的 frontend/dist
     frontend_dist: str = ""
 
