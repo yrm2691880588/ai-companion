@@ -21,6 +21,7 @@ from app.api.v1.chat import router as chat_router
 from app.api.v1.companions import router as companions_router
 from app.api.v1.device import router as device_router
 from app.api.v1.export import router as export_router
+from app.api.v1.import_data import router as import_router
 from app.api.v1.memories import router as memories_router
 from app.api.v1.models import router as models_router
 from app.api.v1.persona_transfer import router as persona_transfer_router
@@ -405,6 +406,7 @@ def create_app(
     app.include_router(me_router)
     app.include_router(device_router)
     app.include_router(export_router)
+    app.include_router(import_router)
     app.include_router(admin_router)
     app.include_router(chat_router)
     app.include_router(memories_router)

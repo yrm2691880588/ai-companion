@@ -166,6 +166,24 @@ backend/.venv/Scripts/python.exe scripts/backup_db.py --restore tmp/backup.json 
 | 依赖 | 纯 Python 直连，**不需要装 pg_dump** |
 | 恢复顺序 | 按外键依赖自动排序（父表先写），不会因约束冲突失败 |
 
+## 数据导入（换机迁移）
+
+```powershell
+# 1. 旧机器导出
+curl "http://127.0.0.1:8000/v1/me/export" -o export.json
+
+# 2. 新机器导入（PowerShell）
+Invoke-RestMethod "http://127.0.0.1:8000/v1/me/import" -Method Post -ContentType "application/json" -InFile export.json
+```
+
+| 项 | 规则 |
+|---|---|
+| 去重单位 | **伴侣 ULID** |
+| 重复处理 | 已存在的伴侣整棵子树跳过，**不覆盖**现有数据 |
+| 返回报告 | `created` 新建 / `skipped` 跳过 / `failed` 逐项原因 |
+| 单项失败 | 不中断整包，其余照常导入 |
+| 版本校验 | 文件 `version` 高于当前支持值时拒绝，避免写入不认识的字段 |
+
 ## 查询用量（真实调用落库后）
 
 ```powershell

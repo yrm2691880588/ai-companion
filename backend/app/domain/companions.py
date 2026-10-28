@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any, Protocol
 
 from app.core.errors import AppError, InvalidInput, NotFound
+from app.core.ids import new_ulid
 from app.domain.persona import DIMENSION_KEYS, Persona, compile_prompt
 from app.domain.templates import TemplateRepository
 from app.domain.usage import CallContext
@@ -76,11 +77,14 @@ class CompanionRepository(Protocol):
         persona: Persona,
         compiled_prompt: str,
         derived_from: int | None = None,
+        ulid: str | None = None,
     ) -> CompanionRecord: ...
 
     async def list(self, user_id: str) -> list[CompanionRecord]: ...
 
     async def get(self, user_id: str, companion_id: int) -> CompanionRecord | None: ...
+
+    async def find_by_ulid(self, user_id: str, ulid: str) -> CompanionRecord | None: ...
 
     async def add_version(
         self, user_id: str, companion_id: int, persona: Persona, compiled_prompt: str
@@ -116,6 +120,7 @@ class InMemoryCompanionRepository:
         persona: Persona,
         compiled_prompt: str,
         derived_from: int | None = None,
+        ulid: str | None = None,
     ) -> CompanionRecord:
         record = CompanionRecord(
             id=self._next_id,
@@ -125,10 +130,20 @@ class InMemoryCompanionRepository:
             persona=persona,
             compiled_prompt=compiled_prompt,
             derived_from=derived_from,
+            ulid=ulid or new_ulid(),
         )
         self._items[record.id] = record
         self._next_id += 1
         return record
+
+    async def find_by_ulid(self, user_id: str, ulid: str) -> CompanionRecord | None:
+        cleaned = (ulid or "").strip()
+        if not cleaned:
+            return None
+        for item in self._items.values():
+            if item.user_id == user_id and item.ulid == cleaned:
+                return item
+        return None
 
     async def list(self, user_id: str) -> list[CompanionRecord]:
         return sorted(
@@ -310,6 +325,7 @@ class CompanionService:
         *,
         name: str | None = None,
         derived_from: int | None = None,
+        ulid: str | None = None,
     ) -> CompanionRecord:
         if await self._repo.count(user_id) >= MAX_COMPANIONS:
             raise AppError(
@@ -329,6 +345,7 @@ class CompanionService:
             record_persona,
             compile_prompt(record_persona),
             derived_from=derived_from,
+            ulid=ulid,
         )
 
     async def list(self, user_id: str) -> list[CompanionRecord]:

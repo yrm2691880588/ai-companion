@@ -34,6 +34,7 @@ class SqlCompanionRepository:
         persona: Persona,
         compiled_prompt: str,
         derived_from: int | None = None,
+        ulid: str | None = None,
     ) -> CompanionRecord:
         async with self._session_factory() as session:
             companion = Companion(
@@ -41,7 +42,7 @@ class SqlCompanionRepository:
                 name=name,
                 current_version=1,
                 memory_enabled=True,
-                ulid=new_ulid(),
+                ulid=ulid or new_ulid(),
                 origin_device_id=current_device_id(),
                 derived_from=derived_from,
             )
@@ -193,6 +194,37 @@ class SqlCompanionRepository:
             companion.memory_enabled = enabled
             await session.commit()
             return True
+
+    async def find_by_ulid(self, user_id: str, ulid: str) -> CompanionRecord | None:
+        """按 ULID 查伴侣，用于导入去重；空值直接返回 None。"""
+        cleaned = (ulid or "").strip()
+        if not cleaned:
+            return None
+        async with self._session_factory() as session:
+            companion = (
+                await session.execute(
+                    select(Companion).where(
+                        Companion.user_id == user_id,
+                        Companion.ulid == cleaned,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if companion is None:
+                return None
+            row = (
+                await session.execute(
+                    select(CompanionPersona)
+                    .where(
+                        CompanionPersona.companion_id == companion.id,
+                        CompanionPersona.version == companion.current_version,
+                    )
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            return _to_record(companion, row)
 
     async def set_avatar(
         self, user_id: str, companion_id: int, avatar: str | None
