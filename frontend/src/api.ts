@@ -344,7 +344,16 @@ export const api = {
   },
   async transcribe(audio: Blob, providerKey = "volcengine"): Promise<{ text: string; duration_ms: number }> {
     const form = new FormData();
-    form.append("file", audio, "voice.webm");
+    // 后端按 Content-Type 判断音频格式（不看文件名）。这里按真实类型命名，
+    // 保证 FormData 里的 Content-Type 与音频实际格式一致，避免 MIME 错配。
+    const extension = audio.type.includes("wav")
+      ? "wav"
+      : audio.type.includes("ogg")
+        ? "ogg"
+        : audio.type.includes("mp3")
+          ? "mp3"
+          : "webm";
+    form.append("file", audio, `voice.${extension}`);
     const response = await fetch(apiUrl(`/v1/voice/transcribe?provider_key=${providerKey}`), {
       method: "POST",
       body: form,

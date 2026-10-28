@@ -1,7 +1,9 @@
 /** 语音：录音、上传、播放。
 
 VAD（语音活动检测）交给 @ricky0123/vad-web：它用 Silero 模型判断「说完了没有」，
-不需要用户手动点「说完了」。资源文件由 scripts/sync_vad_assets.py 复制到 public/vad。
+停顿足够久就自动结束并交回音频；用户也可以随时点「说完了，发送」手动结束，
+两条路径都走 submitUserSpeechOnPause 把已录片段交出来。
+资源文件由 scripts/sync_vad_assets.py 复制到 public/vad。
 */
 
 import { MicVAD } from "@ricky0123/vad-web";
@@ -21,17 +23,11 @@ export interface RecorderOptions {
 }
 
 export interface Recorder {
+  /** 用户点「说完了」：把已录到的音频交出来去识别。 */
   stop: () => void;
+  /** 用户点「取消」：丢弃已录音频，不发送。 */
+  cancel: () => void;
   elapsedMs: () => number;
-}
-
-function pickMimeType(): string {
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"];
-  if (typeof MediaRecorder === "undefined") return "";
-  for (const type of candidates) {
-    if (MediaRecorder.isTypeSupported?.(type)) return type;
-  }
-  return "";
 }
 
 export function isRecordingSupported(): boolean {
@@ -78,7 +74,10 @@ export function encodeWav(samples: Float32Array, sampleRate = 16000): Blob {
 
 /**
  * 启动 VAD 自动录音：检测到说话开始，说完自动结束并回调音频。
- * 返回的 stop() 用于用户主动取消。
+ *
+ * 返回的 Recorder 有两个结束方式，语义不同：
+ * - `stop()`：**提交**。把已录片段通过 onSpeechEnd 交出去识别；
+ * - `cancel()`：**取消**。丢弃已录片段，不发送。
  */
 export async function startVadRecording(options: RecorderOptions = {}): Promise<Recorder> {
   if (!isRecordingSupported()) {
@@ -86,8 +85,14 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
   }
   const startedAt = Date.now();
   let finished = false;
+  let cancelled = false;
   // 计时器只赋值一次，用对象包一层是为了能在闭包里安全引用
   const ticker: { id?: number } = {};
+
+  // 统一销毁：VAD 可能已被销毁，重复调用不应抛错
+  const destroyVad = (): void => {
+    void vad.destroy().catch(() => undefined);
+  };
 
   const vad = await MicVAD.new({
     baseAssetPath: "/vad/",
@@ -103,6 +108,8 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
     minSpeechMs: 500,
     // 保留开口前 800ms，避免吞掉第一个字
     preSpeechPadMs: 800,
+    // 关键：手动 pause 时把已录片段交出来，否则「点按钮结束」拿不到音频
+    submitUserSpeechOnPause: true,
     onSpeechStart: () => options.onSpeechStart?.(),
     onFrameProcessed: (probabilities) => {
       options.onLevel?.(probabilities.isSpeech);
@@ -116,15 +123,21 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
       if (durationMs < 400) {
         options.onLevel?.(0);
         options.onTooShort?.();
-        void vad.destroy();
+        destroyVad();
         return;
       }
       options.onSpeechEnd?.(encodeWav(audio), durationMs);
-      void vad.destroy();
+      destroyVad();
     },
     onVADMisfire: () => {
       options.onLevel?.(0);
+      // 手动点「说完了」但录到的有效语音不足时也会走到这里。
+      // 必须销毁 VAD 释放麦克风流，否则组件已丢弃引用，卸载也收不回来。
+      if (finished || cancelled) return;
+      finished = true;
+      if (ticker.id !== undefined) window.clearInterval(ticker.id);
       options.onTooShort?.();
+      destroyVad();
     },
   });
 
@@ -134,80 +147,28 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
       finished = true;
       if (ticker.id !== undefined) window.clearInterval(ticker.id);
       options.onTimeout?.();
-      void vad.destroy();
+      destroyVad();
     }
   }, 500);
 
   return {
     elapsedMs: () => Date.now() - startedAt,
+    // 用户点「说完了」：pause 会把已录片段交出来（见 submitUserSpeechOnPause）
     stop: () => {
-      if (finished) return;
-      finished = true;
+      if (finished || cancelled) return;
       if (ticker.id !== undefined) window.clearInterval(ticker.id);
-      void vad.destroy();
+      // 不置 finished，让 pause 触发的 onSpeechEnd 能正常送达音频
+      void vad
+        .pause()
+        .catch(() => undefined)
+        .then(destroyVad);
     },
-  };
-}
-
-/** 兜底路径：VAD 不可用时手动录音（保留给旧浏览器）。 */
-export async function startRecording(options: RecorderOptions = {}): Promise<Recorder> {
-  if (!isRecordingSupported()) {
-    throw new Error("这个浏览器不支持录音，请换 Chrome 或 Edge");
-  }
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const mimeType = pickMimeType();
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-  const chunks: Blob[] = [];
-  const startedAt = Date.now();
-  let meter: number | undefined;
-  let closed = false;
-
-  const audioContext = new AudioContext();
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 512;
-  audioContext.createMediaStreamSource(stream).connect(analyser);
-  const buffer = new Uint8Array(analyser.frequencyBinCount);
-
-  const stopAll = () => {
-    if (closed) return;
-    closed = true;
-    if (meter !== undefined) window.clearInterval(meter);
-    stream.getTracks().forEach((track) => track.stop());
-    void audioContext.close();
-  };
-
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data);
-  };
-  recorder.start(200);
-
-  if (options.onLevel) {
-    const onLevel = options.onLevel;
-    meter = window.setInterval(() => {
-      analyser.getByteFrequencyData(buffer);
-      let sum = 0;
-      for (const value of buffer) sum += value;
-      onLevel(Math.min(1, sum / buffer.length / 80));
-    }, 100);
-  }
-
-  const maxMs = options.maxMs ?? MAX_RECORD_MS;
-  const timer = window.setInterval(() => {
-    if (Date.now() - startedAt >= maxMs) options.onTimeout?.();
-  }, 500);
-
-  return {
-    elapsedMs: () => Date.now() - startedAt,
-    stop: () => {
-      try {
-        if (recorder.state !== "inactive") recorder.stop();
-      } catch {
-        // 已停止
-      }
-      window.clearInterval(timer);
-      const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
-      stopAll();
-      if (blob.size > 0) options.onSpeechEnd?.(blob, Date.now() - startedAt);
+    // 用户点「取消」：丢弃录音，不发送
+    cancel: () => {
+      if (finished) return;
+      cancelled = true;
+      if (ticker.id !== undefined) window.clearInterval(ticker.id);
+      destroyVad();
     },
   };
 }
