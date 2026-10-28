@@ -14,6 +14,8 @@ export interface RecorderOptions {
   onSpeechStart?: () => void;
   /** 自动检测到说完，回调 wav 音频与时长 */
   onSpeechEnd?: (audio: Blob, durationMs: number) => void;
+  /** 说话太短或没听清（VAD 判为误触），用于提示用户，不送识别 */
+  onTooShort?: () => void;
   maxMs?: number;
   onTimeout?: () => void;
 }
@@ -92,13 +94,15 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
     onnxWASMBasePath: "/vad/",
     model: "v5",
     startOnLoad: true,
-    positiveSpeechThreshold: 0.6,
-    negativeSpeechThreshold: 0.35,
-    // 停顿 700ms 判定说完
-    redemptionMs: 700,
-    // 少于 300ms 的当误触丢弃
-    minSpeechMs: 300,
-    preSpeechPadMs: 300,
+    // 阈值贴近库默认值：0.6 太严，小声说话不触发，导致截到的是静音
+    positiveSpeechThreshold: 0.35,
+    negativeSpeechThreshold: 0.25,
+    // 停顿 1.3 秒才判定说完，给「想一下再继续说」留余地
+    redemptionMs: 1300,
+    // 少于 500ms 的当误触（咳嗽、敲键盘），不送识别
+    minSpeechMs: 500,
+    // 保留开口前 800ms，避免吞掉第一个字
+    preSpeechPadMs: 800,
     onSpeechStart: () => options.onSpeechStart?.(),
     onFrameProcessed: (probabilities) => {
       options.onLevel?.(probabilities.isSpeech);
@@ -108,11 +112,19 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
       finished = true;
       if (ticker.id !== undefined) window.clearInterval(ticker.id);
       const durationMs = Math.round((audio.length / 16000) * 1000);
+      // 太短的片段不送识别，直接提示重说，避免"没有识别到内容"的困惑
+      if (durationMs < 400) {
+        options.onLevel?.(0);
+        options.onTooShort?.();
+        void vad.destroy();
+        return;
+      }
       options.onSpeechEnd?.(encodeWav(audio), durationMs);
       void vad.destroy();
     },
     onVADMisfire: () => {
       options.onLevel?.(0);
+      options.onTooShort?.();
     },
   });
 

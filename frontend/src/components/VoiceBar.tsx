@@ -55,6 +55,14 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
           clearTicker();
           void sendAudio(audio);
         },
+        onTooShort: () => {
+          clearTicker();
+          setError("没听清，请靠近麦克风再说一次");
+          window.setTimeout(() => setError(""), 3000);
+          setPhase("idle");
+          setLevel(0);
+          setElapsed(0);
+        },
         onTimeout: () => {
           clearTicker();
           setError("已到 60 秒上限，自动结束");
