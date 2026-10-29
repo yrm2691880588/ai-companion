@@ -176,13 +176,101 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
 /** 播放一段音频；返回停止函数，便于打断。 */
 export function playAudio(url: string, onEnded?: () => void): () => void {
   const audio = new Audio(url);
-  audio.onended = () => onEnded?.();
-  void audio.play().catch(() => {
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
     onEnded?.();
-  });
+  };
+  audio.onended = finish;
+  // 播放失败也要收尾，否则调用方会永远以为「还在说」
+  audio.onerror = finish;
+  void audio.play().catch(finish);
   return () => {
     audio.pause();
     audio.currentTime = 0;
+    // 打断时同样要通知调用方，否则 speaking 状态会永久卡住
+    finish();
+  };
+}
+
+/**
+ * 分段播放队列：把流式合成返回的多段音频按顺序无缝播完。
+ *
+ * 为什么需要它：流式合成边生成边返回音频块，如果每块都 new Audio 会互相打断；
+ * 必须排队，且要支持随时中断（用户关掉语音、切会话、点停止）。
+ */
+export interface SpeechPlayer {
+  /** 追加一段音频地址，排到队尾。 */
+  enqueue: (url: string) => void;
+  /** 队列播完且没有新块时回调一次。 */
+  onIdle: (handler: () => void) => void;
+  /** 立即停止并清空队列。 */
+  stop: () => void;
+  /** 已入队但未播完的块数，用于判断是否真的结束。 */
+  pending: () => number;
+}
+
+export function createSpeechPlayer(): SpeechPlayer {
+  const queue: string[] = [];
+  let current: HTMLAudioElement | null = null;
+  let idleHandler: (() => void) | undefined;
+  let stopped = false;
+  // 每段播放结束后，等一小会儿再判定「全部说完」，给后续块留到达时间
+  let idleTimer: number | undefined;
+
+  function scheduleIdle() {
+    if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => {
+      if (stopped) return;
+      if (current || queue.length > 0) return;
+      idleHandler?.();
+    }, 400);
+  }
+
+  function playNext() {
+    if (stopped) return;
+    const url = queue.shift();
+    if (!url) {
+      scheduleIdle();
+      return;
+    }
+    const audio = new Audio(url);
+    current = audio;
+    const advance = () => {
+      if (current === audio) current = null;
+      audio.onended = null;
+      audio.onerror = null;
+      playNext();
+    };
+    audio.onended = advance;
+    audio.onerror = advance;
+    void audio.play().catch(advance);
+  }
+
+  return {
+    enqueue: (url) => {
+      if (stopped) return;
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+      queue.push(url);
+      if (!current) playNext();
+    },
+    onIdle: (handler) => {
+      idleHandler = handler;
+    },
+    stop: () => {
+      stopped = true;
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+      queue.length = 0;
+      if (current) {
+        current.pause();
+        current.currentTime = 0;
+        current.onended = null;
+        current.onerror = null;
+        current = null;
+      }
+    },
+    pending: () => queue.length + (current ? 1 : 0),
   };
 }
 

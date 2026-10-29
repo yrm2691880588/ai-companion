@@ -8,7 +8,8 @@ import { track } from "../lib/analytics";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import VoiceBar from "../components/VoiceBar";
-import { playAudio } from "../lib/voice";
+import { createStreamingSpeaker } from "../lib/speech";
+import type { StreamingSpeaker } from "../lib/speech";
 import type { Message, Session } from "../lib/types";
 
 const STICK_THRESHOLD = 80;
@@ -75,6 +76,8 @@ function Chat({ companionId }: { companionId: number }) {
   const [voiceOn, setVoiceOn] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const stopPlayRef = useRef<(() => void) | null>(null);
+  // 当前正在播报的流式语音，用于关语音/切会话时立刻停下
+  const speakerRef = useRef<StreamingSpeaker | null>(null);
   const [showJump, setShowJump] = useState(false);
   const [error, setError] = useState("");
 
@@ -111,6 +114,8 @@ function Chat({ companionId }: { companionId: number }) {
     return () => {
       active = false;
       abortRef.current?.abort();
+      speakerRef.current?.stop();
+      speakerRef.current = null;
       stopPlayRef.current?.();
     };
     // 路由按 companionId 挂载，初始化只选一次会话。
@@ -123,10 +128,18 @@ function Chat({ companionId }: { companionId: number }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, streaming, openerLoading]);
 
+  /** 立刻停止语音播报并复位状态；关语音、切会话、卸载都走这里。 */
+  function stopSpeaking() {
+    speakerRef.current?.stop();
+    speakerRef.current = null;
+    stopPlayRef.current?.();
+    stopPlayRef.current = null;
+    setSpeaking(false);
+  }
+
   async function selectSession(id: number) {
     abortRef.current?.abort();
-    stopPlayRef.current?.();
-    setSpeaking(false);
+    stopSpeaking();
     setSessionId(id);
     setError("");
     setShowJump(false);
@@ -177,6 +190,23 @@ function Chat({ companionId }: { companionId: number }) {
     if (messages.length === 0) track("first_message");
     const controller = new AbortController();
     abortRef.current = controller;
+    // 流式语音：边收文字边按句合成边播放，首声比整段合成提前数秒
+    const speaker =
+      voiceOn && companion?.voice_id
+        ? createStreamingSpeaker({
+            voiceId: companion.voice_id,
+            sessionId,
+            onFirstAudio: () => setSpeaking(true),
+            onIdle: () => {
+              setSpeaking(false);
+              speakerRef.current = null;
+            },
+            onError: () => {
+              toast.warning("这句语音没出来，继续看文字吧", { id: "voice-fallback" });
+            },
+          })
+        : null;
+    speakerRef.current = speaker;
     try {
       await streamEvents(
         `/v1/sessions/${sessionId}/messages`,
@@ -187,6 +217,8 @@ function Chat({ companionId }: { companionId: number }) {
               trackedReplyRef.current = true;
               track("first_reply");
             }
+            // 边收边合成：第一句一到就开始出声
+            speaker?.push(delta);
             setMessages((prev) =>
               prev.map((item) =>
                 item.id === tempAssistantId ? { ...item, content: item.content + delta } : item,
@@ -208,26 +240,9 @@ function Chat({ companionId }: { companionId: number }) {
                 setEcho({ messageId: list[list.length - 1].id, items: data.memories });
               }
               setSessions(await client.fetchQuery(queries.sessions(companionId)));
-              const voiceId = companion?.voice_id;
-              if (voiceOn && voiceId) {
-                const last = list[list.length - 1];
-                if (last && last.role === "assistant" && last.content.trim()) {
-                  try {
-                    const speech = await api.synthesize(last.content, voiceId, {
-                      sessionId,
-                    });
-                    stopPlayRef.current?.();
-                    setSpeaking(true);
-                    stopPlayRef.current = playAudio(speech.audio_url, () => {
-                      setSpeaking(false);
-                      stopPlayRef.current = null;
-                    });
-                  } catch {
-                    toast.warning("这条语音没出来，先看文字吧", { id: "voice-fallback" });
-                  }
-                }
-              }
             })();
+            // 语音已在 onDelta 里逐句播报，这里只需把剩余尾巴送出去
+            speaker?.finish();
           },
         },
         controller.signal,
@@ -628,9 +643,7 @@ function Chat({ companionId }: { companionId: number }) {
                 }
                 setVoiceOn(!voiceOn);
                 if (voiceOn) {
-                  stopPlayRef.current?.();
-                  stopPlayRef.current = null;
-                  setSpeaking(false);
+                  stopSpeaking();
                 }
               }}
               title={voiceOn ? "关闭语音模式" : "开启语音模式：说话后她会语音回复"}
@@ -645,11 +658,7 @@ function Chat({ companionId }: { companionId: number }) {
                 <span className="muted">她在说话…</span>
                 <button
                   className="btn ghost"
-                  onClick={() => {
-                    stopPlayRef.current?.();
-                    stopPlayRef.current = null;
-                    setSpeaking(false);
-                  }}
+                  onClick={stopSpeaking}
                 >
                   停止
                 </button>
