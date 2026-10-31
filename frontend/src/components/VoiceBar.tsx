@@ -92,11 +92,6 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
           if (session !== sessionRef.current) return;
           void sendAudio(audio, session);
         },
-        onTooShort: () => {
-          // 音频已交回过（正在识别）就不再报没听清，避免消息发出却提示矛盾的错误
-          if (audioReceivedRef.current === session) return;
-          resetToIdle("没听清，请靠近麦克风再说一次");
-        },
         onTimeout: () => {
           resetToIdle("已到 60 秒上限，自动结束");
         },

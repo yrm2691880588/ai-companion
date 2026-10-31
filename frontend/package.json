@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "test": "node --experimental-strip-types tests/voice.test.mjs && node --experimental-strip-types tests/speech.test.mjs",
     "test:page": "node tests/page-verify.mjs",
-    "test:all": "node tests/page-verify.mjs && node tests/query-verify.mjs && node tests/voice-verify.mjs && node tests/modal-verify.mjs && node tests/menu-verify.mjs && node tests/vad-check.mjs && node tests/voice-deadlock.mjs && node tests/streaming-voice.mjs",
+    "test:all": "node tests/page-verify.mjs && node tests/query-verify.mjs && node tests/voice-verify.mjs && node tests/modal-verify.mjs && node tests/menu-verify.mjs && node tests/vad-check.mjs && node tests/voice-deadlock.mjs && node tests/streaming-voice.mjs && node tests/quiet-mic.mjs",
     "test:voice": "node tests/voice-deadlock.mjs"
   },
   "dependencies": {
