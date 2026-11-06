@@ -4,6 +4,7 @@ import { api } from "../api";
 import { formatDuration, isRecordingSupported, startVadRecording } from "../lib/voice";
 import { getSelectedMic } from "../lib/mic";
 import type { Recorder } from "../lib/voice";
+import { explainErrorText } from "../lib/errors";
 
 interface Props {
   /** 识别出文字后交给对话页去发送 */
@@ -170,7 +171,7 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
       else setError("没有听清，请再说一次");
     } catch (event) {
       if (!mountedRef.current || session !== sessionRef.current) return;
-      setError((event as Error).message);
+      setError(explainErrorText(event));
       setPhase("idle");
       setElapsed(0);
     }

@@ -9,6 +9,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../api";
 import type { UserProfile } from "../lib/types";
+import { explainErrorText } from "../lib/errors";
 
 interface Props {
   companionId?: number;
@@ -61,7 +62,7 @@ export default function UserProfileForm({ companionId, title, description }: Pro
       }
       toast.success("已保存，下一条回复生效", { id: "profile-saved" });
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
     }
   }
 

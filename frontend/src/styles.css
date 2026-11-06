@@ -159,6 +159,13 @@ h2 {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* 网格子项默认 min-width:auto，长内容会把整列撑破导致横向溢出；
+     显式归零后再由子元素自己处理换行 */
+  min-width: 0;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 .card {
@@ -167,6 +174,9 @@ h2 {
   border-radius: var(--radius);
   padding: 14px;
   box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 7%, transparent);
+  /* 卡片自身也要能收缩，否则内部长文本会把卡片撑宽 */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .card h3 {
@@ -938,6 +948,9 @@ label {
   button,
   .btn {
     min-height: 40px;
+    /* 单字按钮（改/删）在手机上只有 11px 宽，手指点不准；
+       给一个最小宽度，保证触控目标够大 */
+    min-width: 44px;
   }
 }
 

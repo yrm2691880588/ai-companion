@@ -6,6 +6,7 @@ import {
   openMic,
   setSelectedMic,
 } from "../lib/mic";
+import { explainError } from "../lib/errors";
 import type { MicDevice } from "../lib/mic";
 
 /**
@@ -33,7 +34,7 @@ export default function MicSettingsCard() {
         probe.getTracks().forEach((track) => track.stop());
         setDevices(await listMicDevices());
       } catch (event) {
-        setError((event as Error).message || "读取麦克风列表失败");
+        setError(explainError(event, "读取麦克风列表失败").message);
       }
     })();
     return () => stopRef.current?.();
@@ -47,7 +48,7 @@ export default function MicSettingsCard() {
       probe.getTracks().forEach((track) => track.stop());
       setDevices(await listMicDevices());
     } catch (event) {
-      setError((event as Error).message || "读取麦克风列表失败");
+      setError(explainError(event, "读取麦克风列表失败").message);
     }
   }
 
@@ -88,7 +89,8 @@ export default function MicSettingsCard() {
       };
     } catch (event) {
       // 试音必须暴露真实结果：选中的设备打不开就直说，不要偷偷换成别的
-      setError(`这个设备打不开：${(event as Error).message || "未知原因"}`);
+      const friendly = explainError(event, "这个设备打不开");
+      setError(friendly.hint ? `${friendly.message}：${friendly.hint}` : friendly.message);
       setTesting(false);
     }
   }

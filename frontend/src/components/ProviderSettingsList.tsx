@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { api } from "../api";
 import Modal from "./Modal";
 import type { DiscoveredModel, Provider } from "../lib/types";
+import { explainErrorText } from "../lib/errors";
 
 interface Props {
   providers: Provider[];
@@ -62,7 +63,7 @@ export default function ProviderSettingsList({ providers }: Props) {
       setEditing(null);
       toast.success("已保存，立即生效", { id: "provider-saved" });
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
     } finally {
       setBusy(false);
     }
@@ -116,7 +117,7 @@ export default function ProviderSettingsList({ providers }: Props) {
       await api.saveProviderSetting(providerKey, { api_key: "" });
       await refreshSettings();
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
     } finally {
       setBusy(false);
     }

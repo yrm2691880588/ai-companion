@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { playAudio } from "../lib/voice";
 import type { VoiceOption } from "../lib/types";
+import { explainErrorText } from "../lib/errors";
 
 interface Props {
   companionId: number;
@@ -29,7 +30,7 @@ export default function VoicePicker({ companionId, value, onChange }: Props) {
       );
       playAudio(speech.audio_url, () => setPreviewing(null));
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
       setPreviewing(null);
     }
   }

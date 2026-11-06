@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { toast } from "sonner";
 import Modal from "./Modal";
+import { explainErrorText } from "../lib/errors";
 
 interface Props {
   /** 已选中的伴侣数量 */
@@ -66,7 +67,7 @@ export default function BatchDeleteModal({
     try {
       await onConfirm(word.trim());
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
       toast.error((event as Error).message);
     }
   }

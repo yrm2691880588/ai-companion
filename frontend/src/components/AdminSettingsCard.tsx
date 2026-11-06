@@ -8,6 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../api";
 import type { AdminSettingsResponse } from "../lib/types";
+import { explainErrorText } from "../lib/errors";
 
 export default function AdminSettingsCard() {
   const client = useQueryClient();
@@ -31,7 +32,7 @@ function AdminEditor({ admin, onSaved }: { admin: AdminSettingsResponse; onSaved
       reset({ model_defaults: saved.settings.model_defaults });
       toast.success("已保存", { id: "admin-saved" });
     } catch (event) {
-      setError((event as Error).message);
+      setError(explainErrorText(event));
     }
   }
 
