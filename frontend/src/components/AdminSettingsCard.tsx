@@ -13,7 +13,7 @@ import { explainErrorText } from "../lib/errors";
 export default function AdminSettingsCard() {
   const client = useQueryClient();
   const adminQuery = useQuery(queries.admin());
-  if (!adminQuery.data) return <p className="muted">{adminQuery.error?.message || "加载管理员设置…"}</p>;
+  if (!adminQuery.data) return <p className="muted">{adminQuery.error?.message || "加载模型设置…"}</p>;
   return <AdminEditor admin={adminQuery.data} onSaved={saved => client.setQueryData(queries.admin().queryKey, saved)} />;
 }
 
@@ -108,7 +108,7 @@ function AdminEditor({ admin, onSaved }: { admin: AdminSettingsResponse; onSaved
 
       <div className="toolbar">
         <button className="primary" type="submit" disabled={isSubmitting}>
-          保存管理员设置
+          保存模型参数
         </button>
       </div>
     </form>

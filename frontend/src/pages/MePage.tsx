@@ -4,21 +4,24 @@ import { Link } from "react-router-dom";
 import AppearanceCard from "../components/AppearanceCard";
 import UserProfileForm from "../components/UserProfileForm";
 
+/**
+ * 我的：只放和你本人有关、别人不会关心的东西。
+ *
+ * 分工（与设置页划清边界）：
+ * - 这里 = 我是谁、外观、关于、数据导出
+ * - 设置 = 系统怎么运转（模型、语音、供应商）
+ *
+ * 之前这里还有模型参数、供应商标签、用量摘要，与设置页重复；
+ * 而且「模型参数可以在这里调整」的文字与实际不符（点进去是设置页），已移除。
+ */
 export default function MePage() {
-  const providerQuery = useQuery(queries.providers());
-  const usageQuery = useQuery(queries.usage());
   const infoQuery = useQuery(queries.systemInfo());
-  const providers = providerQuery.data ?? [];
-  const usage = usageQuery.data;
   const info = infoQuery.data;
-  const error = providerQuery.error?.message || usageQuery.error?.message;
 
   return (
     <div>
       <h1>我的</h1>
-      <p className="muted">身份、外观、模型与数据都在这台机器上，不需要登录。</p>
-
-      {error && <div className="alert">{error}</div>}
+      <p className="muted">你的身份与外观都在这台机器上，不需要登录。</p>
 
       <div style={{ marginTop: 12 }}>
         <UserProfileForm
@@ -32,41 +35,17 @@ export default function MePage() {
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h2>模型</h2>
-        <p className="muted">
-          默认使用 DeepSeek V4.1 Flash；可以在这里调整温度、top_p、思考模式等参数。
-        </p>
+        <h2>数据</h2>
+        <p className="muted">导出后可以带到另一台设备，导入时按 ULID 去重，不会重复。</p>
         <div className="toolbar">
-          <Link className="btn" to="/settings">
-            模型与用量
-          </Link>
-          <a className="btn ghost" href="/v1/me/export" target="_blank" rel="noreferrer">
+          <a className="btn" href="/v1/me/export" target="_blank" rel="noreferrer">
             导出我的数据（JSON）
           </a>
+          <Link className="btn ghost" to="/settings">
+            去设置
+          </Link>
         </div>
       </div>
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <h2>可用供应商</h2>
-        <p className="muted">共 {providers.length} 家；未配置 Key 的供应商不会出现在对话路由里。</p>
-        <div>
-          {providers.slice(0, 6).map((provider) => (
-            <span className="tag" key={provider.key}>
-              {provider.name}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {usage && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <h2>最近 7 天用量</h2>
-          <p className="muted">
-            调用 {usage.totals.calls} 次 · 成本 ¥{usage.totals.cost_cny.toFixed(4)} · 缓存命中{" "}
-            {Math.round(usage.totals.hit_ratio * 100)}%
-          </p>
-        </div>
-      )}
 
       <div className="card" style={{ marginTop: 12 }}>
         <h2>关于</h2>
@@ -84,4 +63,3 @@ export default function MePage() {
     </div>
   );
 }
-

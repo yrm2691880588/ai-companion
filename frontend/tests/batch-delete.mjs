@@ -17,12 +17,47 @@ const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? " - " + detail : ""}`);
 };
 
+// 批量删除要验证「勾选多个 → 一次删掉」，至少需要 3 个伴侣。
+// 数据不够时用接口补齐，避免测试依赖库里恰好剩多少。
 await page.goto(BASE, { waitUntil: "networkidle" });
-await page.waitForTimeout(2000);
+await page.waitForTimeout(1500);
+const seeded = await page.evaluate(async () => {
+  const list = await (await fetch("/v1/companions")).json();
+  const need = Math.max(0, 3 - list.length);
+  const created = [];
+  for (let i = 0; i < need; i += 1) {
+    const response = await fetch("/v1/companions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: `批量测试${i}`,
+        persona: {
+          name: `批量测试${i}`,
+          identity: "测试角色",
+          gender: "不设定",
+          age: 25,
+          personality: ["安静", "可靠"],
+          speaking_style: "句子短，语气平稳。",
+          background: "仅用于自动化测试的临时角色，不涉及真实人物。",
+          tags: ["测试"],
+          relationship: "测试关系",
+        },
+      }),
+    });
+    if (response.ok) created.push((await response.json()).id);
+  }
+  return created;
+});
+if (seeded.length) {
+  console.log(`补齐 ${seeded.length} 个测试伴侣用于批量验证`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
+}
 
 const before = await page.locator(".companion-card").count();
 console.log("初始伴侣数:", before);
 check("有伴侣卡片", before > 0);
+check("伴侣数够验证批量删除", before >= 3, `当前 ${before} 个`);
 
 // 进入批量管理
 await page.getByRole("button", { name: "批量管理" }).click();

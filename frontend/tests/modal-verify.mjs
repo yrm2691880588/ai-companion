@@ -50,8 +50,11 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(500);
 check("Esc 可关闭弹窗", (await page.locator('[role="dialog"]').count()) === 0);
 
-// 2) 语音配置弹窗仍然可用
+// 2) 供应商配置弹窗仍然可用（供应商现在在第三个标签）
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+await page.getByRole("tab", { name: "供应商" }).click();
+await page.waitForTimeout(600);
 await page.getByRole("button", { name: /配置 Key|修改配置/ }).first().click();
 await page.waitForTimeout(500);
 check("供应商弹窗可打开", (await page.locator('[role="dialog"]').count()) > 0);

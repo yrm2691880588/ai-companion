@@ -21,7 +21,10 @@ const check = (name, ok, detail = "") => {
 };
 
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" });
-await page.waitForTimeout(3000);
+await page.waitForTimeout(800);
+// 麦克风现在在「语音与设备」标签里
+await page.getByRole("tab", { name: "语音与设备" }).click();
+await page.waitForTimeout(2500);
 
 const body = await page.locator("body").innerText();
 check("设置页有「麦克风」区块", body.includes("麦克风"));
@@ -55,7 +58,7 @@ if (firstDevice) {
   const saved = await page.evaluate(() => localStorage.getItem("ai-companion-mic-device"));
   check("选择后写入 localStorage", saved === firstDevice, `保存值: ${saved?.slice(0, 10)}`);
 
-  // 刷新页面后应保持选择
+  // 刷新页面后应保持选择（标签状态记在 URL，刷新后仍停在语音标签）
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
   const afterReload = await page.locator("#mic-device").inputValue();

@@ -148,12 +148,59 @@ h2 {
   font-size: 13px;
 }
 
+
+/* ---------- 设置页标签栏 ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  /* 手机上三个标签放得下就好，放不下横向滚动，不要挤压文字 */
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 8px 8px 0 0;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .tab {
+    /* 移动端触控目标不小于 44px */
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+}
+
 .row {
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
-}
+  flex-wrap: wrap;}
 
 .grid {
   display: grid;
@@ -244,6 +291,19 @@ select {
   padding: 9px 11px;
   font-size: 14px;
   font-family: inherit;
+}
+
+/* 勾选框/单选框不该继承上面的满宽与输入框外观，
+   否则会被拉成 900 多像素宽，在表单里看着像错位 */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  margin: 0 6px 0 0;
+  border-radius: 4px;
+  accent-color: var(--accent);
+  vertical-align: middle;
 }
 
 textarea {

@@ -30,6 +30,8 @@ export default function App() {
           </NavLink>
           <NavLink to="/create">创建</NavLink>
           <NavLink to="/me">我的</NavLink>
+          {/* 设置页之前没有导航入口，只能从「我的」页里的链接进，属于可达性问题 */}
+          <NavLink to="/settings">设置</NavLink>
         </nav>
       </header>
       <main className="main">

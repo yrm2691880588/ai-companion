@@ -21,8 +21,12 @@ const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 
-// 1) 语音设置卡片
+// 1) 语音设置卡片（现在在「语音与设备」标签里）
 await page.goto(`${BASE}/settings`, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+// 切到语音标签
+await page.getByRole("tab", { name: "语音与设备" }).click();
+await page.waitForTimeout(600);
 const settingsBody = await page.locator("body").innerText();
 check("设置页有语音分区", settingsBody.includes("语音"));
 check("有 AppID 输入", (await page.locator("#voice-appid").count()) > 0);
