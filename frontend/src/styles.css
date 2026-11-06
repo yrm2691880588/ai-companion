@@ -393,6 +393,31 @@ label {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+}
+
+/* 批量管理：卡片左上角的勾选框 */
+.batch-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.batch-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
 }
 
 .card-main {

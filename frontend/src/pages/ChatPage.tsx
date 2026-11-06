@@ -641,6 +641,17 @@ function Chat({ companionId }: { companionId: number }) {
                   toast.info("先到「模型与用量 → 语音」配置火山 AppID 与 Token", { id: "voice-setup" });
                   return;
                 }
+                if (!voiceOn && !companion?.voice_id) {
+                  // 没设音色就不会合成，用户会以为「语音坏了」。这里直接引导去选。
+                  toast.warning("这个伴侣还没选音色，选一个才能听到她的声音", {
+                    id: "voice-pick",
+                    action: {
+                      label: "去选音色",
+                      onClick: () => navigate(`/companions/${companionId}/persona`),
+                    },
+                  });
+                  return;
+                }
                 setVoiceOn(!voiceOn);
                 if (voiceOn) {
                   stopSpeaking();

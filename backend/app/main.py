@@ -18,6 +18,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import me_router as me_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
+from app.api.v1.companion_batch import router as companion_batch_router
 from app.api.v1.companions import router as companions_router
 from app.api.v1.device import router as device_router
 from app.api.v1.export import router as export_router
@@ -396,6 +397,7 @@ def create_app(
     app.include_router(personas_router)
     app.include_router(provider_settings_router)
     app.include_router(persona_transfer_router)
+    app.include_router(companion_batch_router)
     app.include_router(companions_router)
     app.include_router(system_router)
     app.include_router(templates_router)

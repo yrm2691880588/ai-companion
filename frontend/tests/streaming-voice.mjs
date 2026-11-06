@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pickCompanionWithVoice } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 
@@ -24,7 +25,13 @@ page.on("request", (r) => {
   if (r.url().includes("/v1/voice/synthesize")) synthTimes.push(Date.now());
 });
 
-await page.goto(`${BASE}/companions/19/chat`, { waitUntil: "networkidle" });
+const companionId = await pickCompanionWithVoice(page);
+if (!companionId) {
+  console.log("SKIP 没有可用的测试伴侣（先跑 scripts/seed_test_companion.py）");
+  await browser.close();
+  process.exit(0);
+}
+await page.goto(`${BASE}/companions/${companionId}/chat`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 
 // 打开语音模式
@@ -48,7 +55,16 @@ if (synthTimes.length >= 1) {
   const firstSynth = synthTimes[0] - start;
   check("第一段合成在回复结束前就已发出（流式生效）", firstSynth < 20000, `${firstSynth}ms 时开始合成`);
 }
-check("播报结束后「她在说话」已消失", !body.includes("她在说话…"), "speaking 状态已复位");
+// 播报需要时间（多段串行合成+播放），轮询等待复位而不是固定时长取样
+let spokeEnded = false;
+for (let waited = 0; waited < 40000; waited += 1000) {
+  if (!(await page.locator("body").innerText()).includes("她在说话")) {
+    spokeEnded = true;
+    break;
+  }
+  await page.waitForTimeout(1000);
+}
+check("播报结束后「她在说话」已消失", spokeEnded, spokeEnded ? "speaking 状态已复位" : "40 秒内仍未复位");
 
 // 验证停止按钮/关语音能中断
 await page.locator("textarea").fill("再说一句试试");

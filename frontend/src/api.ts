@@ -193,6 +193,22 @@ export const api = {
       { method: "DELETE" },
     );
   },
+  /** 批量删除的前端提示规则：确认词与上限由后端给出，避免前端复制业务常量。 */
+  async batchDeleteRules(signal?: AbortSignal): Promise<{ confirm: string; max_batch: number }> {
+    return request<{ confirm: string; max_batch: number }>("/v1/companions/batch-delete/rules", {
+      signal,
+    });
+  },
+  /** 批量删除伴侣；确认词由后端规则接口给出，逐个返回成功与失败。 */
+  async batchDeleteCompanions(
+    ids: number[],
+    confirm: string,
+  ): Promise<{ deleted: number[]; failed: { id: number; reason: string }[] }> {
+    return request<{ deleted: number[]; failed: { id: number; reason: string }[] }>(
+      "/v1/companions/batch-delete",
+      { method: "POST", body: JSON.stringify({ ids, confirm }) },
+    );
+  },
   async draftPersona(description: string): Promise<Persona> {
     const result = await request<{ persona: Persona }>("/v1/personas/draft", {
       method: "POST",

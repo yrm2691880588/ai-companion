@@ -9,9 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types tests/voice.test.mjs && node --experimental-strip-types tests/speech.test.mjs",
+    "test": "node --experimental-strip-types tests/voice.test.mjs && node --experimental-strip-types tests/speech.test.mjs && node --experimental-strip-types tests/mic.test.mjs",
     "test:page": "node tests/page-verify.mjs",
-    "test:all": "node tests/page-verify.mjs && node tests/query-verify.mjs && node tests/voice-verify.mjs && node tests/modal-verify.mjs && node tests/menu-verify.mjs && node tests/vad-check.mjs && node tests/voice-deadlock.mjs && node tests/streaming-voice.mjs && node tests/quiet-mic.mjs",
+    "test:all": "node tests/page-verify.mjs && node tests/query-verify.mjs && node tests/voice-verify.mjs && node tests/modal-verify.mjs && node tests/menu-verify.mjs && node tests/vad-check.mjs && node tests/voice-deadlock.mjs && node tests/streaming-voice.mjs && node tests/quiet-mic.mjs && node tests/mic-settings.mjs && node tests/voice-no-voiceid.mjs && node tests/voice-audio-output.mjs && node tests/batch-delete.mjs",
     "test:voice": "node tests/voice-deadlock.mjs"
   },
   "dependencies": {

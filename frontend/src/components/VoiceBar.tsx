@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { api } from "../api";
 import { formatDuration, isRecordingSupported, startVadRecording } from "../lib/voice";
+import { getSelectedMic } from "../lib/mic";
 import type { Recorder } from "../lib/voice";
 
 interface Props {
@@ -81,6 +83,8 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
     setElapsed(0);
     try {
       const recorder = await startVadRecording({
+        // 使用设置里选定的输入设备；未指定则跟随系统默认
+        deviceId: getSelectedMic(),
         onLevel: (value) => {
           if (mountedRef.current) setLevel(value);
         },
@@ -91,6 +95,14 @@ export default function VoiceBar({ onTranscribed, available, providerKey = "volc
           // 用户已取消或已开始下一次录音：丢弃这段音频
           if (session !== sessionRef.current) return;
           void sendAudio(audio, session);
+        },
+        onDeviceFallback: () => {
+          // 用户选的设备不可用，已改用系统默认——必须说出来，否则他会以为在用自己选的
+          toast.warning("选的麦克风不可用，已临时改用系统默认设备", { id: "mic-fallback" });
+        },
+        onEmpty: () => {
+          // 一个字节都没录到：多半是麦克风被别的程序占用，或权限异常
+          resetToIdle("麦克风没有录到声音，检查系统输入设备或被其他程序占用");
         },
         onTimeout: () => {
           resetToIdle("已到 60 秒上限，自动结束");

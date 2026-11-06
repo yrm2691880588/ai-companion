@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pickAnyCompanion } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 
@@ -31,7 +32,13 @@ console.log("我的页有“我的身份”:", meBody.includes("我的身份"));
 console.log("回填昵称:", await page.locator("#up-nick-me").inputValue());
 await page.screenshot({ path: "tmp/verify-profile-me.png", fullPage: true });
 
-await page.goto(`${BASE}/companions/19/persona`, { waitUntil: "networkidle" });
+const anyId = await pickAnyCompanion(page);
+if (!anyId) {
+  console.log("SKIP 没有伴侣可用");
+  await browser.close();
+  process.exit(0);
+}
+await page.goto(`${BASE}/companions/${anyId}/persona`, { waitUntil: "networkidle" });
 const personaBody = await page.locator("body").innerText();
 console.log("人设页有“和她聊时的我”:", personaBody.includes("和她聊时的我"));
 console.log("回填专属身份:", await page.locator("#up-identity-19").inputValue());

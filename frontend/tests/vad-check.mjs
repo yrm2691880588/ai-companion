@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pickCompanionWithVoice } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 const browser = await chromium.launch({
@@ -18,7 +19,13 @@ const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 
-await page.goto(`${BASE}/companions/19/chat`, { waitUntil: "networkidle" });
+const companionId = await pickCompanionWithVoice(page);
+if (!companionId) {
+  console.log("SKIP 没有可用的测试伴侣（先跑 scripts/seed_test_companion.py）");
+  await browser.close();
+  process.exit(0);
+}
+await page.goto(`${BASE}/companions/${companionId}/chat`, { waitUntil: "networkidle" });
 await page.waitForTimeout(2500);
 
 // 开语音模式

@@ -43,6 +43,11 @@ export function createStreamingSpeaker(options: SpeakerOptions): StreamingSpeake
     if (!stopped) options.onIdle?.();
   });
 
+  // 播放失败不能静默吞掉，否则用户只会觉得「没声音」
+  player.onError((message) => {
+    if (!stopped) options.onError?.(message);
+  });
+
   function speak(chunk: string) {
     chain = chain
       .then(async () => {

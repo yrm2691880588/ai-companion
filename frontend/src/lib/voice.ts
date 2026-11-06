@@ -13,16 +13,24 @@
 */
 
 import { MicVAD } from "@ricky0123/vad-web";
+import { getSelectedMic, openMicWithFallback } from "./mic";
+import { MAX_RECORD_MS, formatDuration } from "./recording";
 
-export const MAX_RECORD_MS = 60_000;
+export { MAX_RECORD_MS, formatDuration };
 
 export interface RecorderOptions {
+  /** 指定输入设备；留空则跟随系统默认 */
+  deviceId?: string;
   /** 音量（0~1），用于界面音量条 */
   onLevel?: (level: number) => void;
   /** 检测到开始说话 */
   onSpeechStart?: () => void;
   /** VAD 自动判定说完，或用户手动点发送，都会回调 */
   onSpeechEnd?: (audio: Blob, durationMs: number) => void;
+  /** 录音结束但一个字节都没录到（麦克风被占用或权限异常） */
+  onEmpty?: () => void;
+  /** 指定的设备不可用，已自动改用系统默认设备 */
+  onDeviceFallback?: () => void;
   /** 录音时长到达上限 */
   onTimeout?: () => void;
   maxMs?: number;
@@ -106,15 +114,12 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
   const ticker: { id?: number } = {};
   const guard: { id?: number } = {};
 
-  // 自己拿麦克风流：显式请求增益与降噪，降低「录不到」的概率
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      channelCount: 1,
-      echoCancellation: true,
-      autoGainControl: true,
-      noiseSuppression: true,
-    },
-  });
+  // 自己拿麦克风流：显式请求增益与降噪，降低「录不到」的概率。
+  // 指定设备不可用时退回系统默认——录音宁可换设备也不能整段失败；
+  // 但会通过 onDeviceFallback 告知界面，避免用户以为在用自己选的设备。
+  const opened = await openMicWithFallback(options.deviceId ?? getSelectedMic());
+  const stream = opened.stream;
+  if (opened.fallback) options.onDeviceFallback?.();
 
   const mimeType = pickMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -142,23 +147,29 @@ export async function startVadRecording(options: RecorderOptions = {}): Promise<
     void current.destroy().catch(() => undefined);
   };
 
-  /** 把已录到的数据收尾并回调；audio 一定非空（除非完全没数据）。 */
+  /** 把已录到的数据收尾并回调。 */
   const finalize = () => {
     if (settled) return;
     settled = true;
     if (guard.id !== undefined) window.clearInterval(guard.id);
     if (ticker.id !== undefined) window.clearInterval(ticker.id);
     const durationMs = Date.now() - startedAt;
-    const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+    // 注意：blob 必须在 recorder.stop() 触发的 onstop 里创建。
+    // MediaRecorder 是异步把数据通过 ondataavailable 交出来的，
+    // 在 stop() 之前读 chunks 会拿到空数组，导致上传 0 字节、
+    // 后端回「没有识别到内容」——这是真实用户报的「语音输入不进去」。
     const emit = () => {
       destroyVad();
       stopTracks();
-      if (!cancelled && blob.size > 0) {
+      if (cancelled) return;
+      const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
+      if (blob.size > 0) {
         options.onSpeechEnd?.(blob, durationMs);
+      } else {
+        options.onEmpty?.();
       }
     };
     if (recorder.state !== "inactive") {
-      // 等最后一次 dataavailable 落进 chunks 再收尾
       recorder.onstop = emit;
       try {
         recorder.stop();
@@ -279,6 +290,8 @@ export function playAudio(url: string, onEnded?: () => void): () => void {
 export interface SpeechPlayer {
   enqueue: (url: string) => void;
   onIdle: (handler: () => void) => void;
+  /** 某一段播放失败时回调；不中断整个队列。 */
+  onError: (handler: (message: string) => void) => void;
   stop: () => void;
   pending: () => number;
 }
@@ -287,6 +300,7 @@ export function createSpeechPlayer(): SpeechPlayer {
   const queue: string[] = [];
   let current: HTMLAudioElement | null = null;
   let idleHandler: (() => void) | undefined;
+  let errorHandler: ((message: string) => void) | undefined;
   let stopped = false;
   let idleTimer: number | undefined;
 
@@ -315,8 +329,18 @@ export function createSpeechPlayer(): SpeechPlayer {
       playNext();
     };
     audio.onended = advance;
-    audio.onerror = advance;
-    void audio.play().catch(advance);
+    audio.onerror = () => {
+      // 加载失败（地址失效等）：报错并继续播下一段
+      errorHandler?.("这段语音没能播放，可能是音频地址已过期");
+      advance();
+    };
+    void audio.play().catch((error: unknown) => {
+      // 自动播放被浏览器拦截或解码失败：必须让用户知道，否则表现为「没声音」
+      errorHandler?.(
+        `语音播放被浏览器拦住了：${(error as Error).message || "未知原因"}，点一下页面再试`,
+      );
+      advance();
+    });
   }
 
   return {
@@ -325,6 +349,9 @@ export function createSpeechPlayer(): SpeechPlayer {
       if (idleTimer !== undefined) window.clearTimeout(idleTimer);
       queue.push(url);
       if (!current) playNext();
+    },
+    onError: (handler) => {
+      errorHandler = handler;
     },
     onIdle: (handler) => {
       idleHandler = handler;
@@ -345,10 +372,3 @@ export function createSpeechPlayer(): SpeechPlayer {
   };
 }
 
-/** 把毫秒格式化成 0:05 这样的时长。 */
-export function formatDuration(ms: number): string {
-  const total = Math.floor(ms / 1000);
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}

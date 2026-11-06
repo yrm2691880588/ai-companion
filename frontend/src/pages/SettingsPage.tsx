@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import AdminSettingsCard from "../components/AdminSettingsCard";
 import ProviderSettingsList from "../components/ProviderSettingsList";
 import VoiceSettingsCard from "../components/VoiceSettingsCard";
+import MicSettingsCard from "../components/MicSettingsCard";
 
 export default function SettingsPage() {
   const providerQuery = useQuery(queries.providers());
@@ -29,6 +30,8 @@ export default function SettingsPage() {
       <AdminSettingsCard />
 
       <VoiceSettingsCard />
+
+      <MicSettingsCard />
 
       <h2 style={{ marginTop: 18 }}>供应商</h2>
       <ProviderSettingsList providers={providers} />

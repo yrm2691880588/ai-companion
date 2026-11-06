@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pickCompanionWithVoice } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 const results = [];
@@ -39,14 +40,20 @@ check("教程有控制台链接", (await page.getByRole("link", { name: "打开�
 await page.screenshot({ path: "tmp/verify-voice-settings.png", fullPage: true });
 
 // 3) 对话页语音按钮
-await page.goto(`${BASE}/companions/19/chat`, { waitUntil: "networkidle" });
+const companionId = await pickCompanionWithVoice(page);
+if (!companionId) {
+  console.log("SKIP 没有可用的测试伴侣（先跑 scripts/seed_test_companion.py）");
+  await browser.close();
+  process.exit(0);
+}
+await page.goto(`${BASE}/companions/${companionId}/chat`, { waitUntil: "networkidle" });
 await page.waitForTimeout(2500);
 const chatBody = await page.locator("body").innerText();
 check("对话页有语音模式开关", chatBody.includes("语音模式"));
 check("未配置时标注", chatBody.includes("语音未配置") || chatBody.includes("语音模式：关"));
 
 // 4) 人设页音色：按当前是否已配置语音，断言对应状态
-await page.goto(`${BASE}/companions/19/persona`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/companions/${companionId}/persona`, { waitUntil: "networkidle" });
 const personaBody = await page.locator("body").innerText();
 check("人设页有她的声音", personaBody.includes("她的声音"));
 const voiceConfigured = await page.evaluate(async () => {

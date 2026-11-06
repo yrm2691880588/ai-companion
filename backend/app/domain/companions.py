@@ -28,6 +28,10 @@ MAX_COMPANIONS = 50
 MIN_DESCRIPTION = 4
 MAX_DESCRIPTION = 200
 MAX_AVATAR_BYTES = 300 * 1024
+# 批量删除：一次最多删多少个，以及必须手输的确认词。
+# 规则放这里是因为它属于业务约束，api 层只做协议映射。
+MAX_BATCH_DELETE = 50
+BATCH_DELETE_CONFIRM = "删除"
 AVATAR_RE = re.compile(r"^data:image/(png|jpe?g|webp);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
 
@@ -392,6 +396,48 @@ class CompanionService:
             )
         if not await self._repo.soft_delete(user_id, companion_id):
             raise NotFound("伴侣不存在")
+
+    async def delete_for_batch(
+        self, user_id: str, companion_id: int, confirm: str
+    ) -> CompanionRecord:
+        """批量删除单个：用确认词代替「输入名字」。
+
+        为什么不直接调 delete(record.name)：那等于让服务端自己填答案，
+        确认校验退化为空实现。这里显式要求确认词，语义与单删一致——
+        只是确认凭据从「名字」换成「固定短语」。
+
+        返回被删记录，调用方需要它的 id 排队硬清。
+        """
+        if confirm.strip() != BATCH_DELETE_CONFIRM:
+            raise AppError(
+                code="CONFIRM_MISMATCH",
+                message=f"确认词不正确，请输入「{BATCH_DELETE_CONFIRM}」",
+                status_code=409,
+            )
+        record = await self.get(user_id, companion_id)
+        if not await self._repo.soft_delete(user_id, companion_id):
+            raise NotFound("伴侣不存在")
+        return record
+
+    def check_batch_delete(self, ids: list[int], confirm: str) -> list[int]:
+        """批量删除的前置校验：确认词与数量上限。
+
+        返回去重后的 id 列表。规则属于业务约束，放在 domain 层；
+        api 层只负责把请求转成参数。
+        """
+        if confirm.strip() != BATCH_DELETE_CONFIRM:
+            raise InvalidInput(
+                f"确认词不正确，请输入「{BATCH_DELETE_CONFIRM}」", code="CONFIRM_MISMATCH"
+            )
+        if not ids:
+            raise InvalidInput("没有选中任何伴侣", code="BATCH_EMPTY")
+        if len(ids) > MAX_BATCH_DELETE:
+            raise InvalidInput(
+                f"一次最多删除 {MAX_BATCH_DELETE} 个，请分批操作",
+                code="BATCH_TOO_MANY",
+            )
+        # 去重，避免同一个 id 重复删除导致第二次报「不存在」
+        return list(dict.fromkeys(ids))
 
     async def set_memory_enabled(
         self, user_id: str, companion_id: int, enabled: bool

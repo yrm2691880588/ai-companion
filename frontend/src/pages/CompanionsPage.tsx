@@ -3,8 +3,10 @@ import { queries } from "../lib/queries";
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
+import BatchDeleteModal from "../components/BatchDeleteModal";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
 import { downloadPersona } from "../lib/persona-export";
@@ -58,6 +60,12 @@ export default function CompanionsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Companion | null>(null);
   const [deleteName, setDeleteName] = useState("");
   const [deleting, setDeleting] = useState(false);
+  // 批量管理：进入后可勾选多个伴侣一次性删除
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  // 单批上限由后端给出，用于自动分批
+  const [batchLimit, setBatchLimit] = useState(50);
   const [avatarTarget, setAvatarTarget] = useState<number | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
@@ -121,6 +129,36 @@ export default function CompanionsPage() {
     }
   }
 
+  /** 批量删除：一次确认删多个，超过单批上限时自动分批，返回后刷新并报告结果。 */
+  async function confirmBatchDelete(confirmWord: string) {
+    if (selectedIds.length === 0) return;
+    const ids = [...selectedIds];
+    // 后端单批上限 50；超过就分批，避免用户手工数着勾选
+    const deleted: number[] = [];
+    const failed: { id: number; reason: string }[] = [];
+    for (let index = 0; index < ids.length; index += batchLimit) {
+      const chunk = ids.slice(index, index + batchLimit);
+      const result = await api.batchDeleteCompanions(chunk, confirmWord);
+      deleted.push(...result.deleted);
+      failed.push(...result.failed);
+    }
+    setBatchDeleteOpen(false);
+    setSelectedIds([]);
+    setBatchMode(false);
+    for (const id of deleted) {
+      client.removeQueries({ queryKey: queries.companion(id).queryKey });
+      client.removeQueries({ queryKey: queries.latest(id).queryKey });
+    }
+    await client.invalidateQueries({ queryKey: queries.companions().queryKey });
+    if (failed.length > 0) {
+      toast.warning(
+        `已删除 ${deleted.length} 个，${failed.length} 个失败：${failed[0].reason}`,
+      );
+    } else {
+      toast.success(`已删除 ${deleted.length} 个伴侣`);
+    }
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return;
     if (deleteName.trim() !== deleteTarget.name) {
@@ -148,10 +186,56 @@ export default function CompanionsPage() {
           <h1>我的伴侣</h1>
           <p className="muted">点一张卡就能继续上次的对话。</p>
         </div>
-        <Link className="btn primary" to="/create">
-          创建伴侣
-        </Link>
+        <div className="row" style={{ gap: 8 }}>
+          {items.length > 0 && (
+            <button
+              className="btn ghost"
+              onClick={() => {
+                setBatchMode(!batchMode);
+                setSelectedIds([]);
+                // 取一次后端上限，超过时自动分批
+                void api
+                  .batchDeleteRules()
+                  .then((rules) => setBatchLimit(rules.max_batch))
+                  .catch(() => undefined);
+              }}
+            >
+              {batchMode ? "退出批量" : "批量管理"}
+            </button>
+          )}
+          <Link className="btn primary" to="/create">
+            创建伴侣
+          </Link>
+        </div>
       </div>
+
+      {batchMode && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <strong>已选 {selectedIds.length} 个</strong>
+            <button
+              className="btn ghost"
+              onClick={() =>
+                setSelectedIds(
+                  selectedIds.length === items.length ? [] : items.map((item) => item.id),
+                )
+              }
+            >
+              {selectedIds.length === items.length ? "取消全选" : "全选"}
+            </button>
+            <button
+              className="btn ghost"
+              disabled={selectedIds.length === 0}
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              删除选中
+            </button>
+            <span className="muted" style={{ fontSize: 12 }}>
+              点卡片上的方框选中；删除不可恢复
+            </span>
+          </div>
+        </div>
+      )}
 
       {(error || loadError) && <div className="alert">{error || loadError}</div>}
       {loading ? (
@@ -183,6 +267,25 @@ export default function CompanionsPage() {
               : "还没聊过，打个招呼吧";
             return (
               <div className="card companion-card" key={item.id}>
+                {batchMode && (
+                  <label
+                    className="batch-check"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item.id)}
+                      onChange={(event) =>
+                        setSelectedIds((prev) =>
+                          event.target.checked
+                            ? [...prev, item.id]
+                            : prev.filter((id) => id !== item.id),
+                        )
+                      }
+                      aria-label={`选择 ${item.name}`}
+                    />
+                  </label>
+                )}
                 <Link className="card-main" to={`/companions/${item.id}/chat`}>
                   <div
                     className="avatar avatar-editable"
@@ -288,6 +391,24 @@ export default function CompanionsPage() {
         }}
         onSave={(dataUrl) => void saveCroppedAvatar(dataUrl)}
       />
+
+      {batchDeleteOpen && selectedIds.length > 0 && (
+        <BatchDeleteModal
+          key={selectedIds.join(",")}
+          count={selectedIds.length}
+          names={items.filter((item) => selectedIds.includes(item.id)).map((item) => item.name)}
+          busy={deleting}
+          onCancel={() => setBatchDeleteOpen(false)}
+          onConfirm={async (word) => {
+            setDeleting(true);
+            try {
+              await confirmBatchDelete(word);
+            } finally {
+              setDeleting(false);
+            }
+          }}
+        />
+      )}
 
       {deleteTarget && (
         <Modal

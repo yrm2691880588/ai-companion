@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { formatDuration, MAX_RECORD_MS } from "../src/lib/voice.ts";
+import { formatDuration, MAX_RECORD_MS } from "../src/lib/recording.ts";
 
 test("0 毫秒显示 0:00", () => {
   assert.strictEqual(formatDuration(0), "0:00");

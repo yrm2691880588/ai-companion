@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { pickCompanionWithVoice } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 const results = [];
@@ -38,7 +39,13 @@ await page.waitForTimeout(400);
 check("Esc 可关闭菜单", (await page.getByRole("menu").count()) === 0);
 
 // 3) 聊天页头部菜单
-await page.goto(`${BASE}/companions/19/chat`, { waitUntil: "networkidle" });
+const companionId = await pickCompanionWithVoice(page);
+if (!companionId) {
+  console.log("SKIP 没有可用的测试伴侣（先跑 scripts/seed_test_companion.py）");
+  await browser.close();
+  process.exit(0);
+}
+await page.goto(`${BASE}/companions/${companionId}/chat`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 await page.getByRole("button", { name: "更多操作" }).first().click();
 await page.waitForTimeout(400);
