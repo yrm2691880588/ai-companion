@@ -54,6 +54,25 @@ class PersonaDraftOut(BaseModel):
     cost_cny: float
 
 
+class PersonaRefineIn(BaseModel):
+    """按用户的一句话要求，重写人设草稿里的某个维度。
+
+    人设由前端传入而不是按 id 查库：创建流程里伴侣还没落库，
+    且草稿在用户确认前不应写进正式库（ADR-0001）。
+    """
+
+    persona: Persona
+    dimension: str = Field(max_length=32)
+    hint: str | None = Field(default=None, max_length=200)
+
+
+class PersonaRefineOut(BaseModel):
+    dimension: str
+    value: Any
+    model_key: str
+    cost_cny: float
+
+
 class CompanionCreateIn(BaseModel):
     persona: Persona
     name: str | None = Field(default=None, max_length=20)
@@ -74,6 +93,14 @@ class CompanionOut(BaseModel):
 
 class PersonaPutIn(BaseModel):
     persona: Persona
+
+
+class PersonaVersionOut(BaseModel):
+    """一个人设历史版本。不含 compiled_prompt：体积大且界面用不到。"""
+
+    version: int
+    persona: Persona
+    created_at: datetime
 
 
 class DeriveIn(BaseModel):

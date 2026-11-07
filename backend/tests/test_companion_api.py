@@ -71,6 +71,50 @@ def test_draft_endpoint_generates_persona() -> None:
     assert payload["cost_cny"] == 0.0001
 
 
+def test_refine_endpoint_returns_suggestion_without_saving() -> None:
+    """草稿单维改写：不创建任何伴侣，只返回建议值。"""
+    test_client = client(
+        FakeLLM([json.dumps({"value": "句子更短、更冷，常用短句收尾"}, ensure_ascii=False)])
+    )
+    response = test_client.post(
+        "/v1/personas/refine",
+        json={
+            "persona": PERSONA_DICT,
+            "dimension": "speaking_style",
+            "hint": "再冷一点、短一点",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["dimension"] == "speaking_style"
+    assert payload["value"].startswith("句子更短")
+    assert payload["model_key"] == "fake:model"
+    # 关键：没有创建伴侣
+    assert test_client.get("/v1/companions").json() == []
+
+
+def test_refine_endpoint_rejects_identity_dimension() -> None:
+    test_client = client(FakeLLM([]))
+    response = test_client.post(
+        "/v1/personas/refine",
+        json={"persona": PERSONA_DICT, "dimension": "name", "hint": "换个名字"},
+    )
+    # 项目里 InvalidInput 统一映射 422（不是 400）
+    assert response.status_code == 422
+    assert response.json()["code"] == "DIMENSION_NOT_REFINABLE"
+
+
+def test_refine_endpoint_rejects_bad_dimension_value() -> None:
+    """模型给出不合法值时要报错，而不是把坏数据交给前端。"""
+    test_client = client(FakeLLM([json.dumps({"value": "短"}, ensure_ascii=False)]))
+    response = test_client.post(
+        "/v1/personas/refine",
+        json={"persona": PERSONA_DICT, "dimension": "background", "hint": None},
+    )
+    assert response.status_code == 502
+    assert response.json()["code"] == "PERSONA_GENERATION_FAILED"
+
+
 def test_create_list_and_get_companion() -> None:
     test_client = client(FakeLLM([]))
     created = test_client.post("/v1/companions", json={"persona": PERSONA_DICT})
@@ -140,3 +184,47 @@ def test_rejects_too_many_companions() -> None:
     response = test_client.post("/v1/companions", json={"persona": PERSONA_DICT})
     assert response.status_code == 409
     assert response.json()["code"] == "COMPANION_LIMIT"
+
+
+def test_persona_version_endpoints() -> None:
+    """版本列表 + 还原：还原后版本号递增，历史不丢。"""
+    test_client = client(FakeLLM([]))
+    created = test_client.post("/v1/companions", json={"persona": PERSONA_DICT}).json()
+    cid = created["id"]
+
+    # 创建即 v1
+    listed = test_client.get(f"/v1/companions/{cid}/personas")
+    assert listed.status_code == 200
+    assert [v["version"] for v in listed.json()] == [1]
+
+    # 保存一次 → v2
+    changed = dict(PERSONA_DICT)
+    changed["speaking_style"] = "更冷更短，一次不超过十个字。"
+    saved = test_client.put(f"/v1/companions/{cid}/persona", json={"persona": changed})
+    assert saved.status_code == 200
+    assert saved.json()["current_version"] == 2
+
+    listed = test_client.get(f"/v1/companions/{cid}/personas").json()
+    assert [v["version"] for v in listed] == [2, 1]
+
+    # 还原到 v1 → 变成 v3，内容回到最初
+    restored = test_client.post(f"/v1/companions/{cid}/personas/1/restore")
+    assert restored.status_code == 200
+    assert restored.json()["current_version"] == 3
+    assert restored.json()["persona"]["speaking_style"] == PERSONA_DICT["speaking_style"]
+
+    listed = test_client.get(f"/v1/companions/{cid}/personas").json()
+    assert [v["version"] for v in listed] == [3, 2, 1]
+
+
+def test_restore_missing_version_returns_404() -> None:
+    test_client = client(FakeLLM([]))
+    created = test_client.post("/v1/companions", json={"persona": PERSONA_DICT}).json()
+    response = test_client.post(f"/v1/companions/{created['id']}/personas/99/restore")
+    assert response.status_code == 404
+
+
+# 归属隔离不在这里测：测试环境是「本地单用户模式」，
+# X-User-Id 头会被忽略（所有人都是 local-user），
+# 用请求头造不出第二个用户。归属校验在服务层测（test_companion_service.py
+# 的 test_versions_are_isolated_per_user），那才是真正执行检查的地方。

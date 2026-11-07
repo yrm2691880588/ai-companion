@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.core.errors import AppError, InvalidInput
+from app.core.errors import AppError, InvalidInput, NotFound
 from app.domain.companions import (
     MAX_COMPANIONS,
     CompanionService,
@@ -141,3 +141,161 @@ async def test_regenerate_rejects_invalid_value() -> None:
     with pytest.raises(AppError) as excinfo:
         await service.regenerate_dimension("u1", created.id, "speaking_style", None, "req-3")
     assert excinfo.value.code == "PERSONA_GENERATION_FAILED"
+
+
+# ---------- 草稿单维改写（创建流程里用，不落库） ----------
+
+
+async def test_refine_draft_dimension_returns_value_without_saving() -> None:
+    """草稿改写只返回建议值：不再查库，也不产生新版本。"""
+    service = CompanionService(
+        InMemoryCompanionRepository(), FakeLLM([json.dumps({"value": "句子更短更冷"})])
+    )
+    created = await service.create("u1", PERSONA)
+    value, result = await service.refine_draft_dimension(
+        "u1", created.persona, "speaking_style", "再冷一点", "req-r1"
+    )
+    assert value == "句子更短更冷"
+    assert result.model_key == "fake:model"
+    # 未保存：库里仍是旧值，版本号没变
+    current = await service.get("u1", created.id)
+    assert current.persona.speaking_style != "句子更短更冷"
+    assert current.current_version == 1
+
+
+async def test_refine_draft_works_without_existing_companion() -> None:
+    """关键差异：草稿改写不要求伴侣已存在，创建流程里能直接用。"""
+    service = CompanionService(
+        InMemoryCompanionRepository(),
+        FakeLLM([json.dumps({"value": "从小在南方小城长大，大学去了北方，习惯一个人待着"})]),
+    )
+    # 注意：这里完全没有 create，库里没有任何伴侣
+    value, _ = await service.refine_draft_dimension(
+        "u1", PERSONA, "background", "写得更具体一点", "req-r2"
+    )
+    assert value.startswith("从小在南方小城长大")
+
+
+async def test_refine_draft_rejects_identity_fields() -> None:
+    """名字/性别/年龄不接受 AI 改写：它们是身份锚点与硬约束。"""
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([json.dumps({"value": 1})]))
+    for dimension in ("name", "gender", "age"):
+        with pytest.raises(InvalidInput) as excinfo:
+            await service.refine_draft_dimension("u1", PERSONA, dimension, None, "req-r3")
+        assert excinfo.value.code == "DIMENSION_NOT_REFINABLE"
+
+
+async def test_refine_draft_rejects_unknown_dimension() -> None:
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([json.dumps({"value": "x"})]))
+    with pytest.raises(InvalidInput) as excinfo:
+        await service.refine_draft_dimension("u1", PERSONA, "favorite_color", None, "req-r4")
+    assert excinfo.value.code == "UNKNOWN_DIMENSION"
+
+
+async def test_refine_draft_rejects_overlong_hint() -> None:
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([json.dumps({"value": "x"})]))
+    with pytest.raises(InvalidInput) as excinfo:
+        await service.refine_draft_dimension("u1", PERSONA, "background", "长" * 300, "req-r5")
+    assert excinfo.value.code == "REFINE_HINT_TOO_LONG"
+
+
+async def test_refine_draft_rejects_invalid_persona_after_merge() -> None:
+    """新值单独看着没问题，拼回人设后不合法也要拦住。"""
+    service = CompanionService(
+        InMemoryCompanionRepository(), FakeLLM([json.dumps({"value": "短"})])
+    )
+    with pytest.raises(AppError) as excinfo:
+        await service.refine_draft_dimension("u1", PERSONA, "speaking_style", None, "req-r6")
+    assert excinfo.value.code == "PERSONA_GENERATION_FAILED"
+
+
+async def test_refine_draft_requires_value_field() -> None:
+    """模型返回了 JSON 但没有 value 字段，要给明确错误而不是静默失败。"""
+    service = CompanionService(
+        InMemoryCompanionRepository(), FakeLLM([json.dumps({"result": "写错了"})])
+    )
+    with pytest.raises(AppError) as excinfo:
+        await service.refine_draft_dimension("u1", PERSONA, "background", None, "req-r7")
+    assert excinfo.value.code == "PERSONA_GENERATION_FAILED"
+
+
+# ---------- 人设版本历史与还原 ----------
+
+
+async def test_versions_start_at_one() -> None:
+    """创建即 v1：历史列表要有起点。"""
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    versions = await service.list_persona_versions("u1", created.id)
+    assert [v.version for v in versions] == [1]
+
+
+async def test_saving_persona_adds_version() -> None:
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    updated_persona = PERSONA.model_copy(
+        update={"speaking_style": "更冷更短的句子，一次不超过十个字。"}
+    )
+    saved = await service.replace_persona("u1", created.id, updated_persona)
+    assert saved.current_version == 2
+    versions = await service.list_persona_versions("u1", created.id)
+    assert [v.version for v in versions] == [2, 1]
+    # 新的在前
+    assert versions[0].persona.speaking_style.startswith("更冷更短")
+
+
+async def test_restore_version_creates_new_version_instead_of_rewinding() -> None:
+    """还原 = 复制成新版本，不是把指针拨回去。"""
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    original_style = created.persona.speaking_style
+
+    # 改两次，共 3 个版本
+    await service.replace_persona(
+        "u1",
+        created.id,
+        PERSONA.model_copy(update={"speaking_style": "第二版的说话方式，比较冷静。"}),
+    )
+    await service.replace_persona(
+        "u1",
+        created.id,
+        PERSONA.model_copy(update={"speaking_style": "第三版的说话方式，非常热情。"}),
+    )
+
+    restored = await service.restore_persona_version("u1", created.id, 1)
+    # 还原后是 v4，内容回到 v1
+    assert restored.current_version == 4
+    assert restored.persona.speaking_style == original_style
+    # 历史全在：4/3/2/1
+    versions = await service.list_persona_versions("u1", created.id)
+    assert [v.version for v in versions] == [4, 3, 2, 1]
+
+
+async def test_restore_unknown_version_fails() -> None:
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    with pytest.raises(NotFound):
+        await service.restore_persona_version("u1", created.id, 99)
+
+
+async def test_versions_are_pruned_to_limit() -> None:
+    """版本不会无限增长：超过上限只留最近的。"""
+    from app.domain.companions import MAX_PERSONA_VERSIONS
+
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    for index in range(MAX_PERSONA_VERSIONS + 5):
+        await service.replace_persona(
+            "u1",
+            created.id,
+            PERSONA.model_copy(update={"speaking_style": f"第 {index} 次修改后的说话方式说明。"}),
+        )
+    versions = await service.list_persona_versions("u1", created.id)
+    assert len(versions) == MAX_PERSONA_VERSIONS
+
+
+async def test_versions_are_isolated_per_user() -> None:
+    service = CompanionService(InMemoryCompanionRepository(), FakeLLM([]))
+    created = await service.create("u1", PERSONA)
+    with pytest.raises(NotFound):
+        await service.list_persona_versions("u2", created.id)

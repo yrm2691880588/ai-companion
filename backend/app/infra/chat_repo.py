@@ -196,6 +196,32 @@ class SqlChatRepository:
             ).scalar_one_or_none()
         return _to_message(row) if row is not None else None
 
+    async def find_reply_after(
+        self, user_id: str, session_id: int, seq: int
+    ) -> MessageRecord | None:
+        """取某个 seq 之后的第一条助手消息。
+
+        用于幂等重试：如果上次已经生成过回复，直接把那条补发出去，不重新调模型。
+        """
+        async with self._session_factory() as session:
+            row = (
+                await session.execute(
+                    select(ChatMessage)
+                    .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+                    .where(
+                        ChatMessage.session_id == session_id,
+                        ChatSession.user_id == user_id,
+                        ChatSession.deleted_at.is_(None),
+                        ChatMessage.deleted_at.is_(None),
+                        ChatMessage.seq > seq,
+                        ChatMessage.role == "assistant",
+                    )
+                    .order_by(ChatMessage.seq.asc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+        return _to_message(row) if row is not None else None
+
     async def get_message(self, user_id: str, message_id: int) -> MessageRecord | None:
         async with self._session_factory() as session:
             row = (

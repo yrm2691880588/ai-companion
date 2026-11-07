@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -24,9 +25,17 @@ from app.domain.templates import TemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import Message, Role, TaskName, Usage
 
+logger = logging.getLogger(__name__)
+
 MAX_COMPANIONS = 50
 MIN_DESCRIPTION = 4
 MAX_DESCRIPTION = 200
+# 单维 AI 改写时用户补充要求的长度上限。
+# 一句话说清就行，写太长反而会让模型抓不住重点，也多花钱。
+MAX_REFINE_HINT = 200
+# 每个伴侣保留多少个历史人设版本。
+# 每次保存都会新增一行，不设上限会无限增长；20 个足够回退到任意近期的改动。
+MAX_PERSONA_VERSIONS = 20
 MAX_AVATAR_BYTES = 300 * 1024
 # 批量删除：一次最多删多少个，以及必须手输的确认词。
 # 规则放这里是因为它属于业务约束，api 层只做协议映射。
@@ -51,6 +60,19 @@ class CompanionRecord:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     ulid: str = ""
+
+
+@dataclass(slots=True)
+class PersonaVersionRecord:
+    """人设的一个历史版本。
+
+    每次保存人设都会新增一行；这里只带「能展示和还原」需要的字段，
+    不返回 compiled_prompt（体积大，界面也用不到）。
+    """
+
+    version: int
+    persona: Persona
+    created_at: datetime
 
 
 @dataclass(slots=True)
@@ -94,6 +116,18 @@ class CompanionRepository(Protocol):
         self, user_id: str, companion_id: int, persona: Persona, compiled_prompt: str
     ) -> CompanionRecord | None: ...
 
+    async def list_versions(
+        self, user_id: str, companion_id: int
+    ) -> list[PersonaVersionRecord]: ...
+
+    async def get_version(
+        self, user_id: str, companion_id: int, version: int
+    ) -> PersonaVersionRecord | None: ...
+
+    async def prune_versions(
+        self, user_id: str, companion_id: int, keep: int
+    ) -> int: ...
+
     async def soft_delete(self, user_id: str, companion_id: int) -> bool: ...
 
     async def set_memory_enabled(self, user_id: str, companion_id: int, enabled: bool) -> bool: ...
@@ -113,6 +147,8 @@ class InMemoryCompanionRepository:
     def __init__(self) -> None:
         self._items: dict[int, CompanionRecord] = {}
         self._next_id = 1
+        # 内存里的人设版本历史：companion_id → [PersonaVersionRecord]
+        self._versions: dict[int, list[PersonaVersionRecord]] = {}
 
     async def count(self, user_id: str) -> int:
         return sum(1 for item in self._items.values() if item.user_id == user_id)
@@ -137,6 +173,12 @@ class InMemoryCompanionRepository:
             ulid=ulid or new_ulid(),
         )
         self._items[record.id] = record
+        # 创建即 v1：历史列表里要有起点，否则「还原到最初」无从下手
+        self._versions[record.id] = [
+            PersonaVersionRecord(
+                version=1, persona=persona, created_at=datetime.now(UTC)
+            )
+        ]
         self._next_id += 1
         return record
 
@@ -171,7 +213,41 @@ class InMemoryCompanionRepository:
         item.name = persona.name
         item.compiled_prompt = compiled_prompt
         item.updated_at = datetime.now(UTC)
+        # 内存版也要留历史：否则版本列表在测试里永远是空的
+        self._versions.setdefault(companion_id, []).append(
+            PersonaVersionRecord(
+                version=item.current_version, persona=persona, created_at=datetime.now(UTC)
+            )
+        )
         return item
+
+    async def list_versions(
+        self, user_id: str, companion_id: int
+    ) -> list[PersonaVersionRecord]:
+        if await self.get(user_id, companion_id) is None:
+            return []
+        return sorted(
+            self._versions.get(companion_id, []), key=lambda v: v.version, reverse=True
+        )
+
+    async def get_version(
+        self, user_id: str, companion_id: int, version: int
+    ) -> PersonaVersionRecord | None:
+        if await self.get(user_id, companion_id) is None:
+            return None
+        for item in self._versions.get(companion_id, []):
+            if item.version == version:
+                return item
+        return None
+
+    async def prune_versions(self, user_id: str, companion_id: int, keep: int) -> int:
+        if keep < 1 or await self.get(user_id, companion_id) is None:
+            return 0
+        items = sorted(self._versions.get(companion_id, []), key=lambda v: v.version, reverse=True)
+        if len(items) <= keep:
+            return 0
+        self._versions[companion_id] = items[:keep]
+        return len(items) - keep
 
     async def soft_delete(self, user_id: str, companion_id: int) -> bool:
         item = await self.get(user_id, companion_id)
@@ -492,7 +568,39 @@ class CompanionService:
         )
         if record is None:
             raise NotFound("伴侣不存在")
+        # 版本不无限增长：只保留最近 MAX_PERSONA_VERSIONS 个。
+        #
+        # 清理失败不能影响保存本身：add_version 已经提交，用户要的人设已经生效。
+        # 清理只是「顺手收垃圾」，失败了下次保存再清也一样，
+        # 但若让它把异常抛出去，用户会看到「保存失败」而实际已保存，反而更糟。
+        try:
+            await self._repo.prune_versions(user_id, companion_id, MAX_PERSONA_VERSIONS)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "人设版本清理失败，不影响保存：companion=%s", companion_id, exc_info=True
+            )
         return record
+
+    async def list_persona_versions(
+        self, user_id: str, companion_id: int
+    ) -> list[PersonaVersionRecord]:
+        """历史人设，最新的在前。"""
+        await self.get(user_id, companion_id)  # 校验归属，不存在会抛 NotFound
+        return await self._repo.list_versions(user_id, companion_id)
+
+    async def restore_persona_version(
+        self, user_id: str, companion_id: int, version: int
+    ) -> CompanionRecord:
+        """把某个历史版本的内容还原成一个**新版本**。
+
+        为什么不直接把 current_version 改回去：
+        那样会丢弃之后的版本，用户一旦还原就再也回不到「还原前」的状态。
+        复制成新版本后，还原本身也是可撤销的。
+        """
+        target = await self._repo.get_version(user_id, companion_id, version)
+        if target is None:
+            raise NotFound("这个版本不存在")
+        return await self.replace_persona(user_id, companion_id, target.persona)
 
     async def patch_dimension(
         self, user_id: str, companion_id: int, dimension: str, value: Any
@@ -555,6 +663,88 @@ class CompanionService:
             raise AppError(
                 code="PERSONA_GENERATION_FAILED",
                 message=f"重写结果不合法：{exc}",
+                status_code=502,
+            ) from exc
+        return data["value"], result
+
+    async def refine_draft_dimension(
+        self,
+        user_id: str,
+        persona: Persona,
+        dimension: str,
+        hint: str | None,
+        request_id: str,
+    ) -> tuple[Any, LLMResult]:
+        """按用户的自然语言要求，重写人设草稿里的某一个维度。
+
+        与 regenerate_dimension 的区别（重要）：
+
+        - regenerate_dimension 要求伴侣**已经落库**，因为它先按 id 查当前人设；
+        - 这个方法接受**前端传入的草稿**，不查库、不落库，只返回建议值。
+
+        为什么要这样：创建流程里伴侣还不存在，没有 id 可查；而且按 ADR-0001，
+        人设草稿在用户确认前不应写进正式库。用户点「采用」后由前端把新值写回表单，
+        真正保存发生在创建伴侣那一刻。
+        """
+        if dimension not in DIMENSION_KEYS:
+            raise InvalidInput(f"不支持重写的维度：{dimension}", code="UNKNOWN_DIMENSION")
+        if dimension in ("name", "gender", "age"):
+            # 名字是用户的身份锚点、性别年龄是硬约束，交给 AI 改没有意义且容易跑偏
+            raise InvalidInput("这个字段不支持 AI 改写", code="DIMENSION_NOT_REFINABLE")
+
+        cleaned_hint = (hint or "").strip()
+        if len(cleaned_hint) > MAX_REFINE_HINT:
+            raise InvalidInput(
+                f"要求太长了，请控制在 {MAX_REFINE_HINT} 字以内",
+                code="REFINE_HINT_TOO_LONG",
+            )
+
+        context = CallContext(
+            user_id=user_id, request_id=request_id, task=TaskName.PERSONA_GENERATE
+        )
+        current = persona.model_dump()
+        messages = [
+            Message(
+                role=Role.SYSTEM,
+                content=(
+                    "你在帮用户调整一个角色人设里的单个维度。只输出 JSON："
+                    '{"value": 新值}，不要输出解释。'
+                    "要求：\n"
+                    "1. 只改被点名的那个维度，其他维度一律不动；\n"
+                    "2. 写作风格、人称、详略要与原人设保持一致；\n"
+                    "3. 类型要和原值相同（列表就是列表，字符串就是字符串）；\n"
+                    "4. 不要引入和原人设矛盾的信息。"
+                ),
+            ),
+            Message(
+                role=Role.USER,
+                content=(
+                    "当前人设（JSON）：\n"
+                    f"{json.dumps(current, ensure_ascii=False)}\n\n"
+                    f"要调整的维度：{dimension}\n"
+                    f"该维度当前值：{json.dumps(current.get(dimension), ensure_ascii=False)}\n"
+                    f"用户的要求：{cleaned_hint or '让它更贴合这个角色'}"
+                ),
+            ),
+        ]
+        result = await self._llm.complete(TaskName.PERSONA_GENERATE, messages, context=context)
+        data = extract_json(result.text)
+        if "value" not in data:
+            raise AppError(
+                code="PERSONA_GENERATION_FAILED",
+                message="没生成出来，换个说法再试一次",
+                status_code=502,
+            )
+
+        # 用整份草稿做一次校验：新值单独合法不代表拼进人设后也合法
+        payload = dict(current)
+        payload[dimension] = data["value"]
+        try:
+            Persona.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise AppError(
+                code="PERSONA_GENERATION_FAILED",
+                message=f"生成的内容不符合字段要求：{exc}",
                 status_code=502,
             ) from exc
         return data["value"], result

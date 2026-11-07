@@ -12,6 +12,8 @@ from app.api.v1.companion_schemas import (
     DimensionMetaOut,
     PersonaDraftIn,
     PersonaDraftOut,
+    PersonaRefineIn,
+    PersonaRefineOut,
     PersonaSchemaOut,
 )
 from app.domain.companions import CompanionService
@@ -48,6 +50,29 @@ async def generate_draft(
     )
     return PersonaDraftOut(
         persona=persona,
+        model_key=result.model_key,
+        cost_cny=float(result.cost_cny),
+    )
+
+
+@router.post("/refine", response_model=PersonaRefineOut)
+async def refine_dimension(
+    payload: PersonaRefineIn,
+    request: Request,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> PersonaRefineOut:
+    """按用户的一句话要求，重写人设草稿里的某个维度。
+
+    不落库：只返回建议值，由前端展示给用户确认后写回表单。
+    真正保存发生在创建伴侣那一刻。
+    """
+    value, result = await service.refine_draft_dimension(
+        user_id, payload.persona, payload.dimension, payload.hint, request_id(request)
+    )
+    return PersonaRefineOut(
+        dimension=payload.dimension,
+        value=value,
         model_key=result.model_key,
         cost_cny=float(result.cost_cny),
     )

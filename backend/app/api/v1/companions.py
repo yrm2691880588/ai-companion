@@ -16,6 +16,7 @@ from app.api.v1.companion_schemas import (
     DimensionRegenerateIn,
     DimensionRegenerateOut,
     PersonaPutIn,
+    PersonaVersionOut,
     TemplateCreateIn,
     VoiceIn,
 )
@@ -89,6 +90,35 @@ async def replace_persona(
 ) -> CompanionOut:
     """整体保存人设：生成新版本，历史版本保留，从下一条回复开始生效。"""
     return _out(await service.replace_persona(user_id, companion_id, payload.persona))
+
+
+@router.get("/{companion_id}/personas", response_model=list[PersonaVersionOut])
+async def list_persona_versions(
+    companion_id: int,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> list[PersonaVersionOut]:
+    """人设的历史版本，最新的在前。"""
+    versions = await service.list_persona_versions(user_id, companion_id)
+    return [
+        PersonaVersionOut(
+            version=item.version, persona=item.persona, created_at=item.created_at
+        )
+        for item in versions
+    ]
+
+
+@router.post(
+    "/{companion_id}/personas/{version}/restore", response_model=CompanionOut
+)
+async def restore_persona_version(
+    companion_id: int,
+    version: int,
+    user_id: Annotated[str, Depends(get_current_user_id)],
+    service: Annotated[CompanionService, Depends(get_companion_service)],
+) -> CompanionOut:
+    """把某个历史版本还原成新版本（历史不丢，还原本身也可撤销）。"""
+    return _out(await service.restore_persona_version(user_id, companion_id, version))
 
 
 @router.patch("/{companion_id}/persona", response_model=CompanionOut)

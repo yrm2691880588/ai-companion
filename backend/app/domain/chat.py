@@ -131,6 +131,12 @@ class ChatRepository(Protocol):
         self, user_id: str, session_id: int, client_request_id: str
     ) -> MessageRecord | None: ...
 
+    async def find_reply_after(
+        self, user_id: str, session_id: int, seq: int
+    ) -> MessageRecord | None:
+        """找某个 seq 之后的第一条助手消息，用于幂等重试时判断回复是否已生成。"""
+        ...
+
     async def get_message(self, user_id: str, message_id: int) -> MessageRecord | None: ...
 
     async def update_message(
@@ -248,6 +254,17 @@ class InMemoryChatRepository:
             ),
             None,
         )
+
+    async def find_reply_after(
+        self, user_id: str, session_id: int, seq: int
+    ) -> MessageRecord | None:
+        session = await self.get_session(user_id, session_id)
+        if session is None:
+            return None
+        for item in sorted(self.messages.get(session_id, []), key=lambda m: m.seq):
+            if item.seq > seq and item.role == "assistant":
+                return item
+        return None
 
     async def get_message(self, user_id: str, message_id: int) -> MessageRecord | None:
         for session_id, items in self.messages.items():
@@ -568,17 +585,54 @@ class ChatService:
             raise InvalidInput(f"单条消息最多 {MAX_MESSAGE_CHARS} 字")
         session = await self.get_session(user_id, session_id)
         companion = await self._companions.get(user_id, session.companion_id)
-        if client_request_id:
-            duplicated = await self._repo.find_by_request(user_id, session_id, client_request_id)
-            if duplicated is not None:
-                raise AppError(
-                    code="DUPLICATE_REQUEST", message="这条消息已经发送过了", status_code=409
-                )
 
-        user_message = await self._repo.append_message(
-            user_id, session_id, "user", text, client_request_id
-        )
-        yield ChatMeta(session_id=session_id, user_message_id=user_message.id)
+        # ---------- 幂等：同一个 client_request_id 再来一次 ----------
+        #
+        # 语义应当是「返回同样的结果」，而不是「拒绝」。
+        # 前端「失败重试」复用的就是这个 ID，所以这里必须走通，否则重试永远失败。
+        #
+        # 分两种情况：
+        #   a) 上次已经生成完助手回复 → 直接把那条回复补发出去，不调模型、不扣费；
+        #   b) 上次只落了用户消息、流就断了（最常见）→ 沿用这条消息，继续生成。
+        # 只有「用户消息存在但内容对不上」才视为冲突。
+        user_message = None
+        if client_request_id:
+            duplicated = await self._repo.find_by_request(
+                user_id, session_id, client_request_id
+            )
+            if duplicated is not None:
+                if duplicated.content.strip() != text:
+                    # 同一个 ID 配上不同内容，说明客户端复用 ID 出错了
+                    raise AppError(
+                        code="DUPLICATE_REQUEST",
+                        message="同一个请求标识已经用于另一条消息",
+                        status_code=409,
+                    )
+                existing_reply = await self._repo.find_reply_after(
+                    user_id, session_id, duplicated.seq
+                )
+                if existing_reply is not None:
+                    # 情况 a：回复已经在库里，原样补发
+                    yield ChatMeta(session_id=session_id, user_message_id=duplicated.id)
+                    yield ChatDelta(existing_reply.content)
+                    yield ChatDone(
+                        assistant_message_id=existing_reply.id,
+                        model_key="",
+                        usage=Usage(),
+                        memories=[],
+                    )
+                    return
+                # 情况 b：只有用户消息，继续往下生成（不再插入新消息）
+                user_message = duplicated
+
+        if user_message is None:
+            user_message = await self._repo.append_message(
+                user_id, session_id, "user", text, client_request_id
+            )
+            yield ChatMeta(session_id=session_id, user_message_id=user_message.id)
+        else:
+            # 重试时也要告诉前端这条用户消息的 id，前端靠它把临时气泡替换成真实消息
+            yield ChatMeta(session_id=session_id, user_message_id=user_message.id)
 
         if self._quota is not None:
             await self._quota.consume(user_id)

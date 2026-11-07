@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.device import current_device_id
 from app.core.ids import new_ulid
-from app.domain.companions import CompanionRecord
+from app.domain.companions import CompanionRecord, PersonaVersionRecord
 from app.domain.persona import Persona
 from app.models.companions import Companion, CompanionPersona
 
@@ -159,6 +159,108 @@ class SqlCompanionRepository:
                 created_at=companion.created_at or datetime.now(UTC),
                 updated_at=companion.updated_at,
             )
+
+    async def list_versions(
+        self, user_id: str, companion_id: int
+    ) -> list[PersonaVersionRecord]:
+        """按版本号倒序返回历史人设（最新的在前）。"""
+        async with self._session_factory() as session:
+            owned = (
+                await session.execute(
+                    select(Companion.id).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if owned is None:
+                return []
+            rows = (
+                await session.execute(
+                    select(CompanionPersona)
+                    .where(CompanionPersona.companion_id == companion_id)
+                    .order_by(CompanionPersona.version.desc())
+                )
+            ).scalars().all()
+        return [
+            PersonaVersionRecord(
+                version=row.version,
+                persona=Persona.model_validate(row.persona),
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
+
+    async def get_version(
+        self, user_id: str, companion_id: int, version: int
+    ) -> PersonaVersionRecord | None:
+        async with self._session_factory() as session:
+            owned = (
+                await session.execute(
+                    select(Companion.id).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if owned is None:
+                return None
+            row = (
+                await session.execute(
+                    select(CompanionPersona).where(
+                        CompanionPersona.companion_id == companion_id,
+                        CompanionPersona.version == version,
+                    )
+                )
+            ).scalar_one_or_none()
+        if row is None:
+            return None
+        return PersonaVersionRecord(
+            version=row.version,
+            persona=Persona.model_validate(row.persona),
+            created_at=row.created_at,
+        )
+
+    async def prune_versions(self, user_id: str, companion_id: int, keep: int) -> int:
+        """只保留最近的 keep 个版本，返回删掉的行数。
+
+        为什么需要：每次保存都新增一行，改得多了会无限增长。
+        删的永远是最旧的版本。
+        """
+        if keep < 1:
+            return 0
+        async with self._session_factory() as session:
+            owned = (
+                await session.execute(
+                    select(Companion.id).where(
+                        Companion.id == companion_id,
+                        Companion.user_id == user_id,
+                        Companion.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if owned is None:
+                return 0
+            versions = (
+                await session.execute(
+                    select(CompanionPersona.version)
+                    .where(CompanionPersona.companion_id == companion_id)
+                    .order_by(CompanionPersona.version.desc())
+                )
+            ).scalars().all()
+            if len(versions) <= keep:
+                return 0
+            stale = versions[keep:]
+            await session.execute(
+                delete(CompanionPersona).where(
+                    CompanionPersona.companion_id == companion_id,
+                    CompanionPersona.version.in_(stale),
+                )
+            )
+            await session.commit()
+        return len(stale)
 
     async def soft_delete(self, user_id: str, companion_id: int) -> bool:
         async with self._session_factory() as session:

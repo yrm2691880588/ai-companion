@@ -138,3 +138,70 @@ async def test_delete_session_hides_it() -> None:
     await service.delete_session("u1", session_id)
     with pytest.raises(AppError):
         await service.get_session("u1", session_id)
+
+
+# ---------- 幂等重试：同一个 client_request_id 再来一次 ----------
+
+
+async def test_retry_after_complete_reply_returns_existing_reply() -> None:
+    """情况 a：上次已经生成完回复，重试应原样补发，不重新调模型。"""
+    service, repo, _, _, session_id = await make_service([ChatChunk(delta="已经生成好的回复")])
+    first = await collect(service, session_id, "你好", "r1")
+    assert any(isinstance(e, ChatDelta) for e in first)
+
+    # 先按正常路径发一次带 request_id 的
+    repo_messages_before = len(repo.messages.get(session_id, []))
+    events1 = [
+        event
+        async for event in service.stream_reply(
+            "u1", session_id, "重试测试", "r3", client_request_id="retry-req"
+        )
+    ]
+    assert any(isinstance(e, ChatDelta) for e in events1)
+    calls_after_first = len(service._streamer.calls)  # type: ignore[attr-defined]
+
+    # 重试：应拿到同样的回复，且不再调用模型
+    events2 = [
+        event
+        async for event in service.stream_reply(
+            "u1", session_id, "重试测试", "r4", client_request_id="retry-req"
+        )
+    ]
+    deltas2 = [e.text for e in events2 if isinstance(e, ChatDelta)]
+    assert "".join(deltas2) == "已经生成好的回复"
+    assert isinstance(events2[-1], ChatDone)
+    # 关键：模型没有被再调一次
+    assert len(service._streamer.calls) == calls_after_first  # type: ignore[attr-defined]
+    # 也没有多插一条消息
+    assert len(repo.messages.get(session_id, [])) == repo_messages_before + 2
+
+
+async def test_retry_after_interrupted_stream_continues_generation() -> None:
+    """情况 b：上次只落了用户消息、流就断了，重试应继续生成而不是报错。"""
+    service, repo, _, _, session_id = await make_service([ChatChunk(delta="续上了")])
+    # 模拟「上次用户消息已落库，但助手回复没生成」
+    await repo.append_message("u1", session_id, "user", "断掉的消息", "broken-req")
+
+    events = [
+        event
+        async for event in service.stream_reply(
+            "u1", session_id, "断掉的消息", "r2", client_request_id="broken-req"
+        )
+    ]
+    assert isinstance(events[0], ChatMeta)
+    deltas = [e.text for e in events if isinstance(e, ChatDelta)]
+    assert "".join(deltas) == "续上了"
+    # 没有重复插入用户消息：只有原来那条 user + 新生成的 assistant
+    roles = [m.role for m in repo.messages.get(session_id, [])]
+    assert roles.count("user") == 1
+
+
+async def test_same_request_id_with_different_content_is_rejected() -> None:
+    """同一个 ID 配上不同内容：客户端复用 ID 出错了，应当拒绝。"""
+    service, repo, _, _, session_id = await make_service()
+    await repo.append_message("u1", session_id, "user", "原来的内容", "dup-req")
+    with pytest.raises(AppError) as excinfo:
+        await service.stream_reply(
+            "u1", session_id, "完全不同的内容", "r2", client_request_id="dup-req"
+        ).__anext__()
+    assert excinfo.value.code == "DUPLICATE_REQUEST"
