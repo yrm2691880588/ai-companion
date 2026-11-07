@@ -128,37 +128,59 @@ export default function ProviderSettingsList({ providers }: Props) {
     <div>
       <ErrorAlert message={error || settingsQuery.error?.message} variant="inline" />
       <p className="muted">
-        点击供应商卡片配置 API Key 与地址。Key 只保存在本机，加密存储，不会显示明文。
+        点击「配置」填写 API Key 与地址。Key 只保存在本机，加密存储，不会显示明文。
       </p>
-      <div className="grid">
+      <div className="grid provider-grid">
         {providers.map((provider) => {
           const setting = settings[provider.key];
           const hasKey = setting?.has_key ?? provider.has_key;
           const masked = setting?.masked_key ?? provider.masked_key;
+          const address = setting?.base_url || provider.base_url;
           return (
-            <div className="card" key={provider.key}>
-              <div className="row" style={{ justifyContent: "space-between" }}>
+            <div className="card provider-card" key={provider.key}>
+              {/* 头部：名字 + 状态。状态用圆点和底色区分，
+                  原来「已配置/未配置」都是同一个灰胶囊，看不出差别。 */}
+              <div className="provider-head">
                 <h3>{provider.name}</h3>
-                <span className="chip">{hasKey ? "已配置" : "未配置"}</span>
+                <span className={`provider-status${hasKey ? " ready" : ""}`}>
+                  <span className="provider-dot" aria-hidden="true" />
+                  {hasKey ? "已配置" : "未配置"}
+                </span>
               </div>
-              <p className="muted">{setting?.base_url || provider.base_url}</p>
-              <p className="muted">
-                {provider.models.length} 个模型
-                {hasKey ? ` · Key ${masked}` : " · 需要 API Key"}
+
+              {/* 中部：地址与 Key 状态。地址降为小字等宽，不再抢占视觉。 */}
+              <p className="provider-address" title={address}>
+                {address}
               </p>
-              <div>
+              <p className="provider-meta">
+                {provider.models.length} 个模型
+                {hasKey ? ` · ${masked}` : " · 需要 API Key"}
+              </p>
+
+              {/* 模型标签：固定最多显示 3 个，其余折叠成 +N */}
+              <div className="provider-models">
                 {provider.models.slice(0, 3).map((model) => (
                   <span className="tag" key={model.key}>
                     {model.model_name}
                   </span>
                 ))}
+                {provider.models.length > 3 && (
+                  <span className="tag more">+{provider.models.length - 3}</span>
+                )}
               </div>
-              <div className="toolbar">
-                <button className="btn" onClick={() => startEdit(provider)}>
+
+              {/* 底部：主操作与次要操作分开。
+                  「清除 Key」是危险操作，不该和「配置」同样醒目。 */}
+              <div className="provider-actions">
+                <button className="btn primary" onClick={() => startEdit(provider)}>
                   {hasKey ? "修改配置" : "配置 Key"}
                 </button>
                 {hasKey && (
-                  <button className="btn ghost" disabled={busy} onClick={() => void clearKey(provider.key)}>
+                  <button
+                    className="link danger-text"
+                    disabled={busy}
+                    onClick={() => void clearKey(provider.key)}
+                  >
                     清除 Key
                   </button>
                 )}

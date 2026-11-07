@@ -97,14 +97,7 @@ export default function SettingsPage() {
         </>
       )}
 
-      {tab === "provider" && (
-        <>
-          <p className="muted" style={{ marginTop: 12 }}>
-            点击供应商卡片配置 API Key 与地址。Key 只存在本机，加密保存，不会显示明文。
-          </p>
-          <ProviderSettingsList providers={providers} />
-        </>
-      )}
+      {tab === "provider" && <ProviderSettingsList providers={providers} />}
     </div>
   );
 }
