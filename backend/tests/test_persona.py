@@ -92,3 +92,31 @@ def test_dimension_meta_covers_all_editable_fields() -> None:
         "relationship",
         "example_openers",
     ]
+
+
+# ---------- 可改写维度的单一真源 ----------
+
+
+def test_refinable_dimensions_derived_from_meta() -> None:
+    """可改写名单由 DIMENSION_META 派生，不是手写的第二份清单。"""
+    from app.domain.persona import DIMENSION_META, REFINABLE_DIMENSIONS
+
+    expected = tuple(item["key"] for item in DIMENSION_META if item.get("refinable"))
+    assert REFINABLE_DIMENSIONS == expected
+
+
+def test_identity_fields_are_not_refinable() -> None:
+    """名字是身份锚点，性别年龄是硬约束，都不该交给 AI 改。"""
+    from app.domain.persona import REFINABLE_DIMENSIONS
+
+    for field in ("name", "gender", "age"):
+        assert field not in REFINABLE_DIMENSIONS
+
+
+def test_every_dimension_declares_refinable_flag() -> None:
+    """每个维度都必须显式声明 refinable，避免新字段默认漏标。"""
+    from app.domain.persona import DIMENSION_META
+
+    for item in DIMENSION_META:
+        assert "refinable" in item, f"{item['key']} 缺少 refinable 标记"
+        assert isinstance(item["refinable"], bool)

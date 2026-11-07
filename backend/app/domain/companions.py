@@ -20,7 +20,12 @@ from typing import Any, Protocol
 
 from app.core.errors import AppError, InvalidInput, NotFound
 from app.core.ids import new_ulid
-from app.domain.persona import DIMENSION_KEYS, Persona, compile_prompt
+from app.domain.persona import (
+    DIMENSION_KEYS,
+    REFINABLE_DIMENSIONS,
+    Persona,
+    compile_prompt,
+)
 from app.domain.templates import TemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import Message, Role, TaskName, Usage
@@ -352,6 +357,42 @@ def _repair_messages(description: str, previous: str, error: str) -> list[Messag
     ]
 
 
+def _single_dimension_messages(
+    persona: Persona, dimension: str, hint: str | None, *, style: str
+) -> list[Message]:
+    """拼「重写单个维度」的提示词。
+
+    两个调用方（已落库的伴侣 / 前端传来的草稿）的差别只在措辞，
+    规则完全一致，所以提示词在这里统一构造。
+    """
+    current = persona.model_dump()
+    return [
+        Message(
+            role=Role.SYSTEM,
+            content=(
+                "你在修改一个已有角色人设的单个维度。只输出 JSON："
+                '{"value": 新值}，不要输出解释。'
+                "要求：\n"
+                "1. 只改被点名的那个维度，其他维度一律不动；\n"
+                "2. 写作风格、人称、详略要与原人设保持一致；\n"
+                "3. 类型要和原值相同（列表就是列表，字符串就是字符串）；\n"
+                "4. 不要引入和原人设矛盾的信息。"
+                f"\n补充说明：{style}"
+            ),
+        ),
+        Message(
+            role=Role.USER,
+            content=(
+                "当前人设（JSON）：\n"
+                f"{json.dumps(current, ensure_ascii=False)}\n\n"
+                f"要调整的维度：{dimension}\n"
+                f"该维度当前值：{json.dumps(current.get(dimension), ensure_ascii=False)}\n"
+                f"用户的要求：{hint or '更贴合原人设'}"
+            ),
+        ),
+    ]
+
+
 class CompanionService:
     def __init__(
         self,
@@ -616,6 +657,52 @@ class CompanionService:
             raise InvalidInput(f"该维度的取值不合法：{exc}", code="PERSONA_INVALID") from exc
         return await self.replace_persona(user_id, companion_id, persona)
 
+    async def _rewrite_dimension(
+        self,
+        *,
+        user_id: str,
+        persona: Persona,
+        dimension: str,
+        hint: str | None,
+        request_id: str,
+        error_prefix: str,
+        style: str,
+    ) -> tuple[Any, LLMResult]:
+        """让 AI 重写人设里的一个维度，返回建议值（不落库）。
+
+        这是 regenerate_dimension 与 refine_draft_dimension 的共同内核。
+        两者只在「人设从哪来」和少量措辞上不同，其余流程（拼提示词、调模型、
+        取 JSON、用整份人设校验、错误归一）完全一致，所以抽到这里。
+
+        为什么要抽：以后调整「AI 改写人设」的规则（换提示词、加约束、
+        改错误文案），只改这一处，不会出现两条路径行为不一致。
+        """
+        context = CallContext(
+            user_id=user_id, request_id=request_id, task=TaskName.PERSONA_GENERATE
+        )
+        messages = _single_dimension_messages(persona, dimension, hint, style=style)
+        result = await self._llm.complete(TaskName.PERSONA_GENERATE, messages, context=context)
+        data = extract_json(result.text)
+        if "value" not in data:
+            raise AppError(
+                code="PERSONA_GENERATION_FAILED",
+                message=f"{error_prefix}，换个说法再试一次",
+                status_code=502,
+            )
+
+        # 用整份人设做一次校验：新值单独合法，不代表拼进去也合法
+        payload = persona.model_dump()
+        payload[dimension] = data["value"]
+        try:
+            Persona.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise AppError(
+                code="PERSONA_GENERATION_FAILED",
+                message=f"生成的内容不符合字段要求：{exc}",
+                status_code=502,
+            ) from exc
+        return data["value"], result
+
     async def regenerate_dimension(
         self,
         user_id: str,
@@ -624,48 +711,19 @@ class CompanionService:
         hint: str | None,
         request_id: str,
     ) -> tuple[Any, LLMResult]:
+        """重写**已落库**伴侣的某个维度，返回建议值（不落库）。"""
         if dimension not in DIMENSION_KEYS:
             raise InvalidInput(f"不支持重写的维度：{dimension}", code="UNKNOWN_DIMENSION")
         current = await self.get(user_id, companion_id)
-        context = CallContext(
-            user_id=user_id, request_id=request_id, task=TaskName.PERSONA_GENERATE
+        return await self._rewrite_dimension(
+            user_id=user_id,
+            persona=current.persona,
+            dimension=dimension,
+            hint=hint,
+            request_id=request_id,
+            error_prefix="重写失败",
+            style="参考的是这个伴侣当前已保存的人设。",
         )
-        messages = [
-            Message(
-                role=Role.SYSTEM,
-                content=(
-                    '你在修改一个已有角色人设的单个维度。只输出 JSON：{"value": 新值}。'
-                    "其他维度不要动，风格要与原人设一致。"
-                ),
-            ),
-            Message(
-                role=Role.USER, content=json.dumps(current.persona.model_dump(), ensure_ascii=False)
-            ),
-            Message(
-                role=Role.USER,
-                content=f"请重写 {dimension} 维度。补充要求：{hint or '更贴合原人设'}",
-            ),
-        ]
-        result = await self._llm.complete(TaskName.PERSONA_GENERATE, messages, context=context)
-        data = extract_json(result.text)
-        if "value" not in data:
-            raise AppError(
-                code="PERSONA_GENERATION_FAILED",
-                message="重写失败，模型没有返回 value",
-                status_code=502,
-            )
-        # 用当前人设做一次整体校验，确保新值合法
-        payload = current.persona.model_dump()
-        payload[dimension] = data["value"]
-        try:
-            Persona.model_validate(payload)
-        except Exception as exc:  # noqa: BLE001
-            raise AppError(
-                code="PERSONA_GENERATION_FAILED",
-                message=f"重写结果不合法：{exc}",
-                status_code=502,
-            ) from exc
-        return data["value"], result
 
     async def refine_draft_dimension(
         self,
@@ -682,14 +740,14 @@ class CompanionService:
         - regenerate_dimension 要求伴侣**已经落库**，因为它先按 id 查当前人设；
         - 这个方法接受**前端传入的草稿**，不查库、不落库，只返回建议值。
 
-        为什么要这样：创建流程里伴侣还不存在，没有 id 可查；而且按 ADR-0001，
-        人设草稿在用户确认前不应写进正式库。用户点「采用」后由前端把新值写回表单，
+        为什么要这样：创建流程里伴侣还不存在，没有 id 可查；而且草稿在用户
+        确认前不应写进正式库。用户点「采用」后由前端把新值写回表单，
         真正保存发生在创建伴侣那一刻。
         """
         if dimension not in DIMENSION_KEYS:
             raise InvalidInput(f"不支持重写的维度：{dimension}", code="UNKNOWN_DIMENSION")
-        if dimension in ("name", "gender", "age"):
-            # 名字是用户的身份锚点、性别年龄是硬约束，交给 AI 改没有意义且容易跑偏
+        if dimension not in REFINABLE_DIMENSIONS:
+            # 名单来自 DIMENSION_META 的 refinable 标记，不再手写第二份清单
             raise InvalidInput("这个字段不支持 AI 改写", code="DIMENSION_NOT_REFINABLE")
 
         cleaned_hint = (hint or "").strip()
@@ -699,52 +757,12 @@ class CompanionService:
                 code="REFINE_HINT_TOO_LONG",
             )
 
-        context = CallContext(
-            user_id=user_id, request_id=request_id, task=TaskName.PERSONA_GENERATE
+        return await self._rewrite_dimension(
+            user_id=user_id,
+            persona=persona,
+            dimension=dimension,
+            hint=cleaned_hint,
+            request_id=request_id,
+            error_prefix="没生成出来",
+            style="参考的是用户正在编辑、尚未保存的人设草稿。",
         )
-        current = persona.model_dump()
-        messages = [
-            Message(
-                role=Role.SYSTEM,
-                content=(
-                    "你在帮用户调整一个角色人设里的单个维度。只输出 JSON："
-                    '{"value": 新值}，不要输出解释。'
-                    "要求：\n"
-                    "1. 只改被点名的那个维度，其他维度一律不动；\n"
-                    "2. 写作风格、人称、详略要与原人设保持一致；\n"
-                    "3. 类型要和原值相同（列表就是列表，字符串就是字符串）；\n"
-                    "4. 不要引入和原人设矛盾的信息。"
-                ),
-            ),
-            Message(
-                role=Role.USER,
-                content=(
-                    "当前人设（JSON）：\n"
-                    f"{json.dumps(current, ensure_ascii=False)}\n\n"
-                    f"要调整的维度：{dimension}\n"
-                    f"该维度当前值：{json.dumps(current.get(dimension), ensure_ascii=False)}\n"
-                    f"用户的要求：{cleaned_hint or '让它更贴合这个角色'}"
-                ),
-            ),
-        ]
-        result = await self._llm.complete(TaskName.PERSONA_GENERATE, messages, context=context)
-        data = extract_json(result.text)
-        if "value" not in data:
-            raise AppError(
-                code="PERSONA_GENERATION_FAILED",
-                message="没生成出来，换个说法再试一次",
-                status_code=502,
-            )
-
-        # 用整份草稿做一次校验：新值单独合法不代表拼进人设后也合法
-        payload = dict(current)
-        payload[dimension] = data["value"]
-        try:
-            Persona.model_validate(payload)
-        except Exception as exc:  # noqa: BLE001
-            raise AppError(
-                code="PERSONA_GENERATION_FAILED",
-                message=f"生成的内容不符合字段要求：{exc}",
-                status_code=502,
-            ) from exc
-        return data["value"], result

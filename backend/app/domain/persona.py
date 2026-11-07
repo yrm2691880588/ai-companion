@@ -141,6 +141,8 @@ def prompt_tokens(persona: Persona) -> int:
 DIMENSION_META: list[dict[str, Any]] = [
     {
         "key": "name",
+
+        "refinable": False,
         "label": "名字",
         "type": "text",
         "required": True,
@@ -149,6 +151,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "identity",
+
+        "refinable": True,
         "label": "身份",
         "type": "text",
         "required": True,
@@ -157,6 +161,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "gender",
+
+        "refinable": False,
         "label": "性别",
         "type": "select",
         "required": True,
@@ -164,6 +170,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "age",
+
+        "refinable": False,
         "label": "年龄",
         "type": "number",
         "required": False,
@@ -172,6 +180,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "personality",
+
+        "refinable": True,
         "label": "性格特质",
         "type": "list",
         "required": True,
@@ -181,6 +191,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "speaking_style",
+
+        "refinable": True,
         "label": "说话风格",
         "type": "textarea",
         "required": True,
@@ -189,6 +201,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "background",
+
+        "refinable": True,
         "label": "背景设定",
         "type": "textarea",
         "required": True,
@@ -197,6 +211,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "tags",
+
+        "refinable": True,
         "label": "核心标签",
         "type": "list",
         "required": True,
@@ -206,6 +222,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "relationship",
+
+        "refinable": True,
         "label": "关系定位",
         "type": "text",
         "required": False,
@@ -214,6 +232,8 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "example_openers",
+
+        "refinable": True,
         "label": "示例开场白",
         "type": "list",
         "required": False,
@@ -221,3 +241,13 @@ DIMENSION_META: list[dict[str, Any]] = [
         "hint": "2–3 句这个人会说的话",
     },
 ]
+
+# 哪些维度允许交给 AI 改写。
+#
+# 由 DIMENSION_META 派生，不再手写第二份清单：
+# 名字是用户的身份锚点，性别年龄是硬约束，交给 AI 改没有意义且容易跑偏。
+# 以后新增人设字段时，只要在 DIMENSION_META 里标好 refinable，
+# 这里和调用方都会自动跟着变。
+REFINABLE_DIMENSIONS: tuple[str, ...] = tuple(
+    item["key"] for item in DIMENSION_META if item.get("refinable")
+)
