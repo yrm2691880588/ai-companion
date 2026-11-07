@@ -2684,19 +2684,180 @@ label {
 /* ---------- 头像裁剪 ---------- */
 .avatar-crop-box {
   position: relative;
-  width: 256px;
-  height: 256px;
-  margin: 12px auto;
-  border-radius: 50%;
+  /* 用正方形容器 + 深色底：圆形裁剪区之外的部分本来就是「会被裁掉」的区域，
+     深色能让用户一眼看出边界；原来的浅灰方块像是图片没铺满 */
+  width: 280px;
+  height: 280px;
+  flex: none;
+  border-radius: 14px;
   overflow: hidden;
-  background: var(--panel-2);
+  /* 深灰而非纯黑：图片比例和容器不同时，上下会露出底色。
+     纯黑像「图片加载失败」，深灰更像画布/工作台。 */
+  background: #2a2530;
   border: 1px solid var(--line);
 }
 
 /* 让 react-easy-crop 的圆形遮罩与主题色一致 */
 .avatar-crop-box .reactEasyCrop_CropArea {
   border: 2px solid var(--accent);
-  color: rgba(0, 0, 0, 0.42);
+  color: rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- 头像裁剪弹窗 ---------- */
+/* 原来：灰底方块 + 原生蓝色滑杆 + 三个按钮挤在左下，
+   像一个临时拼出来的功能框。这里重排成「左裁剪 / 右预览 / 下方滑杆 / 右下按钮」。 */
+.cropper-modal {
+  width: min(680px, 100%);
+}
+
+/* 按钮统一靠右：主操作（保存）在最右，符合中文阅读习惯。
+   原来三个按钮挤在左下角，看不出主次。 */
+.cropper-modal .toolbar {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.cropper-body {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+@media (max-width: 560px) {
+  /* 手机上横排会挤扁裁剪区，改成上下堆叠、预览居中 */
+  .cropper-body {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .avatar-crop-box {
+    width: min(280px, 78vw);
+    height: min(280px, 78vw);
+  }
+}
+
+/* 右侧实时预览：模拟头像在列表里的真实大小 */
+.cropper-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cropper-preview-label,
+.cropper-preview-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cropper-preview-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--panel-2);
+  border: 2px solid var(--line);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 15%, transparent);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cropper-preview-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- 自定义缩放滑杆 ---------- */
+/* 原生 range 是蓝色圆点 + 细线，与粉色主题完全不搭，这里整体重绘 */
+.cropper-zoom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.cropper-zoom-label {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cropper-zoom-value {
+  flex: none;
+  min-width: 44px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.cropper-zoom input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 20px;
+  cursor: pointer;
+}
+
+/* 轨道 */
+.cropper-zoom input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.cropper-zoom input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+/* 滑块：粉色圆形，带一点阴影，和主题一致 */
+.cropper-zoom input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: transform 120ms ease;
+}
+
+.cropper-zoom input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+
+.cropper-zoom input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* 键盘聚焦时给一个可见的焦点环（无障碍） */
+.cropper-zoom input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 999px;
 }
 
 /* ---------- 管理员参数表单 ---------- */

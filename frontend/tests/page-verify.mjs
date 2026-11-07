@@ -212,7 +212,8 @@ if ((await cropper.count()) > 0) {
   check("保存/取消按钮存在", (await page.getByRole("button", { name: "保存头像" }).count()) > 0);
 
   // 滚轮放大：标签应从 1.0× 变为更大
-  const zoomLabel = page.locator(".modal label.muted").first();
+  // 2026-11 重做裁剪界面后，缩放数值改用 .cropper-zoom-value（原来靠 label.muted 定位）
+  const zoomLabel = page.locator(".cropper-zoom-value").first();
   const beforeZoom = await zoomLabel.innerText();
   await cropper.hover();
   await page.mouse.wheel(0, -600);
