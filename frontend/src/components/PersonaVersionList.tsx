@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { History, RotateCcw } from "lucide-react";
+import { History, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { queries } from "../lib/queries";
 import { api } from "../api";
 import Modal from "./Modal";
@@ -27,7 +27,15 @@ interface Props {
  *
  * 还原的行为：把旧版本的内容**复制成一个新版本**，而不是把指针拨回去。
  * 这样「还原」本身也是可撤销的——还原之后还能再还原回来。
+ *
+ * 折叠：默认只显示最近 COLLAPSED_COUNT 个。
+ * 改得多了列表会很长，一屏看不到头，而多数时候用户只关心最近几版；
+ * 需要翻旧版时再展开，用完可以收起。
  */
+
+/** 折叠时显示几个版本。5 个大约占半屏，再多就开始喧宾夺主。 */
+const COLLAPSED_COUNT = 5;
+
 export default function PersonaVersionList({ companionId, currentVersion, onRestored }: Props) {
   const client = useQueryClient();
   const versionsQuery = useQuery(queries.personaVersions(companionId));
@@ -35,6 +43,7 @@ export default function PersonaVersionList({ companionId, currentVersion, onRest
   const [target, setTarget] = useState<PersonaVersion | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   async function restore() {
     if (!target) return;
@@ -79,32 +88,56 @@ export default function PersonaVersionList({ companionId, currentVersion, onRest
       ) : versions.length <= 1 ? (
         <p className="muted">还没有历史版本，改动并保存后这里会出现记录。</p>
       ) : (
-        <ul className="version-list">
-          {versions.map((item) => {
-            const isCurrent = item.version === currentVersion;
-            return (
-              <li className={`version-item${isCurrent ? " current" : ""}`} key={item.version}>
-                <div className="version-meta">
-                  <strong>第 {item.version} 版</strong>
-                  {isCurrent && <span className="chip">当前</span>}
-                  <span className="muted">{relativeTime(item.created_at)}</span>
-                </div>
-                <p className="version-preview">
-                  {item.persona.speaking_style || item.persona.background || "（无描述）"}
-                </p>
-                {!isCurrent && (
-                  <button
-                    className="btn ghost version-restore"
-                    onClick={() => setTarget(item)}
-                  >
-                    <RotateCcw size={13} aria-hidden="true" />
-                    还原到这版
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="version-list">
+            {(expanded ? versions : versions.slice(0, COLLAPSED_COUNT)).map((item) => {
+              const isCurrent = item.version === currentVersion;
+              return (
+                <li className={`version-item${isCurrent ? " current" : ""}`} key={item.version}>
+                  <div className="version-meta">
+                    <strong>第 {item.version} 版</strong>
+                    {isCurrent && <span className="chip">当前</span>}
+                    <span className="muted">{relativeTime(item.created_at)}</span>
+                  </div>
+                  <p className="version-preview">
+                    {item.persona.speaking_style || item.persona.background || "（无描述）"}
+                  </p>
+                  {!isCurrent && (
+                    <button
+                      className="btn ghost version-restore"
+                      onClick={() => setTarget(item)}
+                    >
+                      <RotateCcw size={13} aria-hidden="true" />
+                      还原到这版
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* 版本多了会撑很长，默认只显示最近几条。
+              展开/收起都保留当前滚动位置不跳。 */}
+          {versions.length > COLLAPSED_COUNT && (
+            <button
+              className="btn ghost version-toggle"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp size={14} aria-hidden="true" />
+                  收起，只看最近 {COLLAPSED_COUNT} 版
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={14} aria-hidden="true" />
+                  展开全部 {versions.length} 个版本
+                </>
+              )}
+            </button>
+          )}
+        </>
       )}
 
       {target && (

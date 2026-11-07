@@ -1541,6 +1541,25 @@ label {
   font-size: 12px;
 }
 
+/* 展开/收起按钮：居中，与版本列表视觉上分开 */
+.version-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.version-toggle:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
 /* ---------- 聊天：加载更早与失败重试 ---------- */
 /* 顶部的「加载更早」：只在还有更早消息时出现 */
 .load-older {

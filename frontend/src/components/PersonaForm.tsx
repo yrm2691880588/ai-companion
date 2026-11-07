@@ -112,7 +112,10 @@ export default function PersonaForm({
               {label}
               <em className="field-hint">{hint}</em>
             </label>
-            {refinable && (
+            {/* 只在可编辑时显示「AI 帮我改」。
+                查看态下字段是禁用的，生成了建议也写不进去，
+                按钮出现只会让用户白跑一趟。 */}
+            {refinable && !locked && (
               <PersonaRefineButton
                 persona={currentPersona()}
                 dimension={name}
