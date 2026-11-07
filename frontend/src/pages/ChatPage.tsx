@@ -786,17 +786,16 @@ function Chat({ companionId }: { companionId: number }) {
                     </div>
                   )}
                   <div className={`msg-row ${item.role}`}>
-                    {/* 助手侧显示头像，用户侧占位，让气泡对齐 */}
-                    {isUser ? (
-                      <span className="msg-avatar placeholder" aria-hidden="true" />
-                    ) : (
+                    {/* 只在助手侧显示头像。
+                        用户侧原来用 visibility:hidden 占着 40px，
+                        自己的气泡左边凭空多出一段空白，看着像没对齐。
+                        「我」是唯一的，右对齐 + 粉色气泡已经足够区分。 */}
+                    {!isUser && (
                       <span className="msg-avatar" aria-hidden="true">
                         {companion?.avatar ? (
                           <img src={companion.avatar} alt="" />
                         ) : (
-                          item.role === "assistant" && companion
-                            ? companion.persona.name.slice(0, 1)
-                            : "她"
+                          companion?.persona.name.slice(0, 1) ?? "她"
                         )}
                       </span>
                     )}

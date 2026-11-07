@@ -414,6 +414,12 @@ label {
      页面标题区和输入区的实际高度也计入，避免出现双滚动条。 */
   height: calc(100vh - var(--topbar-h) - var(--chat-page-pad));
   min-height: 420px;
+  /* 超宽屏上限：一行文字超过约 90 个字符就很难跟读，
+     拉满 2560px 会得到「很宽但读不下去」的对话。
+     上限内居中，两边留白是刻意的。 */
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @media (max-width: 900px) {
@@ -560,8 +566,11 @@ label {
    不用靠气泡颜色去猜。 */
 .msg-row {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  gap: 10px;
+  /* 顶部对齐：头像与气泡第一行文字对齐。
+     原来用 flex-end（底部对齐），短消息的头像会「掉」到气泡下沿，
+     视觉上像是挂不住了，也没有代入感。主流聊天软件都是顶部对齐。 */
+  align-items: flex-start;
   max-width: 100%;
 }
 
@@ -571,29 +580,33 @@ label {
 
 .msg-avatar {
   flex: none;
-  width: 28px;
-  height: 28px;
+  /* 36 → 40：28px 认不出是谁，36px 仍偏小；40px 是微信/Telegram 的消息头像尺寸，
+     能看清表情又不至于压过文字。 */
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--on-accent);
   background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
   overflow: hidden;
-  margin-bottom: 2px;
+  /* 与气泡第一行文字的基线对齐，而不是和气泡框贴死 */
+  margin-top: 1px;
+  /* 一圈细描边：图片边缘与背景混在一起时，头像轮廓更清楚 */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent);
 }
 
 .msg-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
-/* 用户自己的消息不重复显示头像，占位保持气泡对齐 */
-.msg-avatar.placeholder {
-  visibility: hidden;
-}
+/* 用户消息不显示头像（「我」是唯一的，靠右对齐即可区分），
+   所以不再需要隐形占位样式。 */
 
 /* 消息操作：默认只显示一个「⋯」，悬停或聚焦才展开。
    原来每条消息下面平铺「复制 / 删除 / 重新生成」三个小字，
@@ -645,16 +658,21 @@ label {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-.bubble.user {
-  align-self: flex-end;
-  background: var(--accent-soft);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, white);
-}
 
 .bubble.assistant {
   align-self: flex-start;
   background: var(--panel);
   border: 1px solid var(--line);
+  /* 靠近头像的那个角收小：视觉上气泡像是「从头像那边长出来」，
+     而不是一个和头像无关的方块。 */
+  border-top-left-radius: 6px;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, white);
+  border-top-right-radius: 6px;
 }
 
 .composer {
@@ -720,6 +738,10 @@ label {
   gap: 10px;
   margin-bottom: 14px;
   min-width: 0;
+  /* 与 .chat-layout 同宽并居中，否则头部贴在屏幕最左、消息区居中，会错位 */
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .chat-header-text {
@@ -2297,9 +2319,13 @@ label {
 }
 
 .chat-avatar {
-  width: 52px;
-  height: 52px;
-  font-size: 20px;
+  /* 52 → 56：头部是「这是谁」的第一视觉，大一点更有存在感 */
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+  /* 细描边：浅色头像与浅背景不会糊在一起 */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel) 90%, transparent),
+    0 4px 14px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .last-line {
