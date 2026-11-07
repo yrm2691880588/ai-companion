@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
+import { Heart, PenLine, UserRound } from "lucide-react";
+import Loading from "./components/Loading";
 import { track } from "./lib/analytics";
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 const CompanionsPage = lazy(() => import("./pages/CompanionsPage"));
@@ -10,6 +12,13 @@ const MemoryPage = lazy(() => import("./pages/MemoryPage"));
 const PersonaPage = lazy(() => import("./pages/PersonaPage"));
 const RoleplayPage = lazy(() => import("./pages/RoleplayPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+
+/** 一级导航：只放用户每天都会去的三处。设置属于系统配置，收进「我的」。 */
+const NAV_ITEMS = [
+  { to: "/", label: "伴侣", icon: Heart, end: true },
+  { to: "/create", label: "创建", icon: PenLine, end: false },
+  { to: "/me", label: "我的", icon: UserRound, end: false },
+];
 
 export default function App() {
   // 每次应用启动上报一次，用于判断真实打开次数
@@ -24,18 +33,18 @@ export default function App() {
         <Link to="/" className="brand">
           AI 伴侣
         </Link>
-        <nav className="nav">
-          <NavLink to="/" end>
-            伴侣
-          </NavLink>
-          <NavLink to="/create">创建</NavLink>
-          <NavLink to="/me">我的</NavLink>
-          {/* 设置页之前没有导航入口，只能从「我的」页里的链接进，属于可达性问题 */}
-          <NavLink to="/settings">设置</NavLink>
+        <nav className="nav" aria-label="主导航">
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className="nav-link">
+              <Icon size={16} aria-hidden="true" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </nav>
       </header>
       <main className="main">
-        <Suspense fallback={<p className="muted">加载中…</p>}>
+        {/* 路由级懒加载：给骨架而不是一句「加载中…」，避免切换页面时白屏闪一下 */}
+        <Suspense fallback={<Loading lines={3} label="页面加载中" />}>
         <Routes>
           <Route path="/" element={<CompanionsPage />} />
           <Route path="/create" element={<CreatePage />} />

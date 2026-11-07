@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { api } from "../api";
 import type { UserProfile } from "../lib/types";
 import { explainErrorText } from "../lib/errors";
+import ErrorAlert from "./ErrorAlert";
 
 interface Props {
   companionId?: number;
@@ -70,8 +71,10 @@ export default function UserProfileForm({ companionId, title, description }: Pro
     <form className="card" noValidate onSubmit={handleSubmit(save)}>
       <h2>{title}</h2>
       <p className="muted">{description}</p>
-      {(error || loadError) && <div className="alert">{error || loadError}</div>}
-      <div className="field-grid">
+      <ErrorAlert message={error || loadError} variant="inline" />
+      {/* 固定 2×2：宽卡里 auto-fill 会排成 4 列，
+          每个框只有 200px，而下面「补充背景」是通栏，宽窄落差看着参差 */}
+      <div className="field-grid profile-grid">
         <div>
           <label htmlFor={`up-nick-${companionId ?? "me"}`}>她怎么称呼你</label>
           <input

@@ -5,6 +5,8 @@ import { api } from "../api";
 import { playAudio } from "../lib/voice";
 import type { VoiceOption } from "../lib/types";
 import { explainErrorText } from "../lib/errors";
+import ErrorAlert from "./ErrorAlert";
+import Loading from "./Loading";
 
 interface Props {
   companionId: number;
@@ -35,8 +37,22 @@ export default function VoicePicker({ companionId, value, onChange }: Props) {
     }
   }
 
-  if (loading || loadError) {
-    return <div className="card"><h2>她的声音</h2><p className={loadError ? "alert" : "muted"}>{loadError || "加载中…"}</p></div>;
+  if (loading) {
+    return (
+      <div className="card">
+        <h2>她的声音</h2>
+        <Loading lines={2} label="加载音色" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="card">
+        <h2>她的声音</h2>
+        <ErrorAlert message={loadError} variant="inline" onRetry={() => void providersQuery.refetch()} />
+      </div>
+    );
   }
 
   if (!configured) {
@@ -55,9 +71,9 @@ export default function VoicePicker({ companionId, value, onChange }: Props) {
     <div className="card">
       <h2>她的声音</h2>
       <p className="muted">选一个音色，以后语音回复就用这个声音。</p>
-      {error && <div className="alert">{error}</div>}
+      {error && <ErrorAlert message={error} variant="inline" />}
       {loading ? (
-        <p className="muted">加载中…</p>
+        <Loading lines={1} label="加载音色列表" />
       ) : (
         <>
           <select

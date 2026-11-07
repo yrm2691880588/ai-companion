@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { api } from "../api";
 import Modal from "./Modal";
 import type { Persona } from "../lib/types";
+import ErrorAlert from "./ErrorAlert";
 
 interface Props {
   persona: Persona;
@@ -99,7 +100,7 @@ export default function TrialChat({ persona, onClose }: Props) {
         这里只是试聊，不会保存到正式会话，也不会产生记忆。已聊 {userTurns}/3 轮
       </p>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <ErrorAlert message={error} variant="inline" />}
 
       <div className="trial-messages">
         {turns.length === 0 && <p className="muted">说一句试试，看她像不像你想要的人。</p>}

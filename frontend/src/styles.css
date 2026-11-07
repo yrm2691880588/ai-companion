@@ -12,6 +12,16 @@
   --danger: #c43d5b;
   --topbar: rgba(255, 248, 250, 0.92);
   --radius: 14px;
+  /* 这三个变量曾被引用却从未定义（batch-check 背景/边框、菜单与弹窗悬停色），
+     浏览器回退成透明或继承色，表现为「勾选框看不见、悬停没反应」。
+     用引用而非固定色，换主题时自动跟随。 */
+  --surface: var(--panel);
+  --border: var(--line);
+  --ink: var(--text);
+  /* 聊天页整屏高度计算用：顶栏实际高度、页面上下留白与标题区合计。
+     写成变量是为了改一处全站生效，不用在 calc 里硬编码魔数。 */
+  --topbar-h: 57px;
+  --chat-page-pad: 130px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei",
     sans-serif;
 }
@@ -113,24 +123,49 @@ a {
 
 .nav {
   display: flex;
-  gap: 14px;
+  gap: 4px;
   font-size: 14px;
 }
 
-.nav a {
+/* 导航项带图标：图标和文字在同一行，选中时整块有底色，
+   比只变文字颜色更容易一眼看出当前在哪一页 */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 10px;
   color: var(--muted);
+  transition: color 120ms ease, background 120ms ease;
 }
 
-.nav a.active {
+.nav-link:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.nav-link.active {
   color: var(--accent);
+  background: var(--accent-soft);
   font-weight: 600;
 }
 
 .main {
   width: 100%;
-  max-width: 980px;
+  /* 原来固定 980px：1280 屏上右侧空出约 300px，整页看着像没做完。
+     现在分档放宽：普通桌面 1280、超宽屏 1440 封顶。
+     为什么不到 4K 宽度全开：正文一行超过约 90 个字符就很难跟读，
+     把内容拉满 2560px 只会得到一个「很宽但读不下去」的界面。 */
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 20px 16px 80px;
+  padding: 20px 24px 80px;
+}
+
+@media (min-width: 1600px) {
+  .main {
+    max-width: 1440px;
+    padding: 28px 32px 96px;
+  }
 }
 
 h1 {
@@ -252,6 +287,19 @@ button,
   border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
+  /* 按钮里有图标时（<a class="btn"><svg/>文字</a>），
+     原来是行内布局，图标和文字会挤在一起重叠；
+     统一改成 flex + 居中，图标和文字的间距由 gap 控制。 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.btn svg {
+  flex: none;
 }
 
 button:hover {
@@ -324,6 +372,19 @@ label {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
+/* 「我的」页的 2×2 表单：固定两列，不再随宽度自动增加列数。
+   原因：auto-fill 在 1232px 宽的卡片里会排出 4 列，每个输入框只有 200px 宽，
+   而下面的「补充背景」是通栏，宽窄落差看着参差。 */
+.profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .alert {
   border: 1px solid color-mix(in srgb, var(--danger) 35%, white);
   background: color-mix(in srgb, var(--danger) 8%, white);
@@ -346,14 +407,111 @@ label {
 
 .chat-layout {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  /* 撑满顶栏以下的全部高度，聊天区才有「一屏」的感觉。
+     --topbar-h 与 --chat-page-pad 在 :root 里定义，
+     页面标题区和输入区的实际高度也计入，避免出现双滚动条。 */
+  height: calc(100vh - var(--topbar-h) - var(--chat-page-pad));
+  min-height: 420px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
+  /* 手机上把会话列表收成抽屉：
+     原来它堆在聊天区上方，占掉近半屏，每次都要滚过去才能打字。 */
   .chat-layout {
     grid-template-columns: 1fr;
+    height: calc(100vh - var(--topbar-h) - 96px);
+  }
+
+  .chat-layout > aside {
+    position: fixed;
+    /* 从顶栏下方开始，不要盖住页面导航 */
+    top: var(--topbar-h);
+    bottom: 0;
+    left: 0;
+    width: min(300px, 82vw);
+    z-index: 50;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 14px 12px;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    box-shadow: 0 0 40px rgba(44, 36, 48, 0.18);
+  }
+
+  .chat-layout > aside[data-open="true"] {
+    transform: translateX(0);
+  }
+
+  /* 抽屉打开时的遮罩 */
+  .drawer-backdrop {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: rgba(44, 36, 48, 0.32);
+    border: none;
+    padding: 0;
+  }
+
+  /* 抽屉头部：标题 + 关闭按钮 */
+  .drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .drawer-head strong {
+    font-size: 15px;
+  }
+
+  /* 手机端显示抽屉按钮（桌面端在文件后段统一设为 none） */
+  .icon-btn.chat-drawer-btn {
+    display: inline-grid;
+  }
+}
+
+/* 抽屉头部在桌面端隐藏（桌面端会话列表一直是可见的侧栏） */
+.drawer-head {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .drawer-head {
+    display: flex;
+  }
+}
+
+/* 抽屉开关和遮罩默认在桌面端隐藏。
+   用 min-width 反向查询而不是依赖书写顺序：
+   CSS 里媒体查询并不会自动提高优先级，单纯按顺序写很容易被后面的
+   普通规则覆盖（这个 bug 实际发生过：桌面端也显示了抽屉按钮）。
+   这里用 .icon-btn.chat-drawer-btn 两个类提高特异性，
+   否则会被后面同样单类选择器的 .icon-btn { display: grid } 盖掉。 */
+@media (min-width: 901px) {
+  .icon-btn.chat-drawer-btn,
+  .drawer-backdrop {
+    display: none;
+  }
+}
+
+.drawer-backdrop {
+  border: none;
+  padding: 0;
+  /* 默认不显示，只有手机端且打开时才出现 */
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .drawer-backdrop[data-open="true"] {
+    display: block;
   }
 }
 
@@ -378,24 +536,113 @@ label {
   color: var(--text);
 }
 
+/* 消息区的高度由后面那条统一的 .messages 规则决定，
+   这里只放排布；原先的 min-height:320px + max-height:62vh 已移除，
+   那正是「消息只占上半屏、输入框飘中间」的原因。 */
 .messages {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 320px;
-  max-height: 62vh;
-  overflow-y: auto;
-  padding: 4px;
+  gap: 12px;
 }
 
 .bubble {
-  max-width: 82%;
+  max-width: 76%;
   padding: 10px 13px;
   border-radius: 14px;
   font-size: 14px;
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
+}
+
+/* 消息行：头像 + 气泡并排。头像让「谁在说」一眼可见，
+   不用靠气泡颜色去猜。 */
+.msg-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.msg-row.user {
+  flex-direction: row-reverse;
+}
+
+.msg-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.msg-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 用户自己的消息不重复显示头像，占位保持气泡对齐 */
+.msg-avatar.placeholder {
+  visibility: hidden;
+}
+
+/* 消息操作：默认只显示一个「⋯」，悬停或聚焦才展开。
+   原来每条消息下面平铺「复制 / 删除 / 重新生成」三个小字，
+   一屏十几条消息就是几十个按钮，视觉噪音很大。 */
+.msg-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.msg-row:hover .msg-actions,
+.msg-row:focus-within .msg-actions,
+.msg-actions[data-open="true"] {
+  opacity: 1;
+}
+
+/* 触屏设备没有 hover，操作常显 */
+@media (hover: none) {
+  .msg-actions {
+    opacity: 1;
+  }
+}
+
+.msg-action-btn {
+  display: inline-grid;
+  place-items: center;
+  /* 26px 在手机上点不准，统一到 32px；
+     桌面端鼠标操作本来就宽松，不额外放大 */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.msg-action-btn:hover {
+  color: var(--accent);
+  background: var(--panel-2);
+}
+
+.msg-action-btn.danger-text:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .bubble.user {
@@ -413,11 +660,31 @@ label {
 .composer {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  align-items: flex-end;
+  /* 贴底：不再随内容多少上下浮动 */
+  flex: none;
+  margin-top: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
 }
 
 .composer input {
   flex: 1;
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  min-height: 44px;
+  line-height: 1.5;
+}
+
+.composer .btn,
+.composer button {
+  flex: none;
+  min-height: 44px;
 }
 
 .review-grid {
@@ -446,6 +713,1216 @@ label {
   margin: 12px 0;
 }
 
+/* ---------- 聊天页头部 ---------- */
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.chat-header-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-header-text h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.chat-header-text .muted {
+  margin: 1px 0 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* 发送按钮：方形图标按钮，不占输入框宽度 */
+.composer-send {
+  flex: none;
+  min-width: 44px;
+  width: 44px;
+  padding: 0;
+  align-self: flex-end;
+}
+
+.composer-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 语音开关：输入行最左侧的图标按钮 */
+.composer-voice {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  align-self: flex-end;
+}
+
+.composer-voice.active {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 语音开启后才出现的那一行（录音条、状态、计费提示） */
+.composer-extras {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  flex: none;
+}
+
+/* 桌面端：会话列表与消息区之间要有明确分隔，
+   否则两栏贴在一起像同一块内容 */
+.chat-layout > aside {
+  border-right: 1px solid var(--line);
+  padding-right: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- 设置页：标签说明与字段提示 ---------- */
+.tab-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 标签里有图标时，图标和文字垂直居中 */
+.tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 字段下方那行小字：解释这个参数到底影响什么。
+   原来只有「top_p（0–1）」这种术语，用户不知道改了会怎样。 */
+.field-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+/* 任务分组之间的分隔，替代原来靠 marginTop 内联样式 */
+.admin-task {
+  margin-top: 16px;
+}
+
+.admin-task:first-of-type {
+  margin-top: 12px;
+}
+
+.admin-task + .admin-task {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-task h3 {
+  margin: 0 0 10px;
+}
+
+/* ---------- 用量统计 ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.stat-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  margin-bottom: 6px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 每天花费的柱状图：纯 CSS，不引图表库 */
+.usage-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  margin-top: 14px;
+  padding-top: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.usage-bar-col {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.usage-bar {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(
+    180deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 55%, white)
+  );
+  transition: opacity 120ms ease;
+}
+
+.usage-bar:hover {
+  opacity: 0.75;
+}
+
+/* 当天没有调用：给一条很矮的浅色底，表示「这天有、但没花钱」，
+   而不是让它完全消失（消失会让人以为图表漏了几天） */
+.usage-bar.empty {
+  background: var(--line);
+  opacity: 0.55;
+}
+
+.usage-bar-label {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 按模型明细表 */
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.usage-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.usage-table td {
+  padding: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.usage-table tr:last-child td {
+  border-bottom: none;
+}
+
+.usage-model {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+@media (max-width: 720px) {
+  /* 手机上四张统计卡竖排会把图表挤到屏幕外，改成两列 */
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  /* 表格在 390px 下四列挤成一团，改成「每行一张卡」：
+     模型名一行，其余指标用标签对排开。 */
+  .usage-table,
+  .usage-table thead,
+  .usage-table tbody,
+  .usage-table tr,
+  .usage-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .usage-table thead {
+    display: none;
+  }
+
+  .usage-table tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .usage-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .usage-table td {
+    padding: 2px 0;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  /* 用 ::before 补回被隐藏的表头文字，读屏和视觉都有标签 */
+  .usage-table td:nth-child(2)::before {
+    content: "调用";
+    color: var(--muted);
+  }
+
+  .usage-table td:nth-child(3)::before {
+    content: "花费";
+    color: var(--muted);
+  }
+
+  .usage-table td:nth-child(4)::before {
+    content: "首字延迟";
+    color: var(--muted);
+  }
+
+  .usage-model {
+    font-size: 13px;
+    font-weight: 600;
+  }
+}
+
+/* ---------- 创建页：步骤说明与示例 ---------- */
+/* 首屏原来只有一个输入框和一大片空白。
+   这里用三步说明把「接下来会发生什么」讲清楚，也让首屏有内容。 */
+.create-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin: 20px 0 18px;
+}
+
+.create-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.create-step-num {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.create-step strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.create-step .muted {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 示例 chips：点一下直接填入描述 */
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.example-chips .muted {
+  font-size: 12px;
+}
+
+.chip-button {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.chip-button:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--accent-soft);
+}
+
+/* ---------- 模板卡 ---------- */
+/* 原来只有名字 + 分类 + 一句 tagline，选之前不知道她会怎么说话。
+   现在加首字头像和一句示例开场白。 */
+.template-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.template-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.template-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.template-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white));
+}
+
+.template-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.template-body h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.template-body .muted {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.template-line {
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ---------- 记忆卡 ---------- */
+/* 卡片高度原来参差不齐，而且「删除」占一整行红色按钮，
+   比内容本身还显眼。现在删除收进「⋯」，卡片等高。 */
+.memory-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  margin-top: 10px;
+}
+
+.memory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 148px;
+}
+
+.memory-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.memory-content {
+  margin: 0;
+  line-height: 1.65;
+  font-size: 14px;
+  flex: 1;
+}
+
+.memory-quote {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.memory-meta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- 演练场景卡 ---------- */
+/* 原来卡片高度随文本长度参差，5 张卡排完还有一张落单。
+   现在卡片等高、信息用定义列表对齐，难度改成圆点。 */
+.scenario-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.scenario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 210px;
+}
+
+.scenario-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scenario-card h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+/* 难度圆点：5 个点，点亮几个就是几级 */
+.difficulty {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+
+.difficulty .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.difficulty .dot.on {
+  background: var(--accent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 「她扮演 / 你的目标」两行，标签窄、内容宽，比两段 <p> 更整齐 */
+.scenario-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 13px;
+  flex: 1;
+  align-content: start;
+}
+
+.scenario-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.scenario-meta dd {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.scenario-card .btn {
+  margin-top: auto;
+}
+
+/* 五张卡的「开始演练」原来都是实心主按钮，
+   一屏五块高饱和粉色，视觉噪音盖过了卡片内容本身。
+   改成描边按钮，悬停时才填充——主操作位只剩一个（导航里的「创建」）。 */
+.scenario-card .btn.primary {
+  background: transparent;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  font-weight: 600;
+}
+
+.scenario-card .btn.primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---------- 人设字段 + AI 帮我改 ---------- */
+.persona-field {
+  margin-top: 14px;
+}
+
+/* 标签和「AI 帮我改」同一行：标签左、按钮右。
+   这样按钮不会挤在字段名下面，也不会让每行变高。 */
+.persona-field-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.persona-field-head label {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.refine-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.refine-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* 「AI 帮我改」弹窗里的快捷要求 */
+.refine-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 建议值预览：等宽字体、浅底，和输入框区分开，
+   让用户知道这是「候选稿」还不是正式内容 */
+.refine-preview {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+  font-size: 14px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* ---------- 统一错误提示（ErrorAlert） ---------- */
+/* 替代原来散在 19 个文件里的 <div className="alert">。
+   旧 .alert 保留：仍有组件在用，逐步替换，不搞一次性大改。 */
+.error-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, white);
+  background: color-mix(in srgb, var(--danger) 7%, white);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 12px 0;
+}
+
+.error-alert.inline {
+  margin: 8px 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.error-alert-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.error-alert-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.error-alert-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, white);
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.error-alert-btn:hover {
+  background: color-mix(in srgb, var(--danger) 12%, white);
+}
+
+.error-alert-close {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--danger);
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.error-alert-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--danger) 12%, white);
+}
+
+/* ---------- 统一加载骨架（Loading） ---------- */
+.loading-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0;
+}
+
+/* 列表类页面：每块骨架套上卡片边框，加载完不会「突然长出卡片」 */
+.loading-block.with-card .loading-row {
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.loading-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.loading-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.loading-lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- 人设版本列表 ---------- */
+.version-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.version-item {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+/* 当前版本高亮，让用户一眼知道「现在用的是哪个」 */
+.version-item.current {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+}
+
+.version-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.version-meta strong {
+  font-size: 14px;
+}
+
+.version-meta .muted {
+  font-size: 11px;
+}
+
+.version-preview {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.version-restore {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ---------- 聊天：加载更早与失败重试 ---------- */
+/* 顶部的「加载更早」：只在还有更早消息时出现 */
+.load-older {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
+.load-older .btn {
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+/* 失败气泡下方的操作区 */
+.bubble-failed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--danger) 35%, transparent);
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.msg-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, white);
+  background: color-mix(in srgb, var(--danger) 10%, white);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.msg-retry:hover {
+  background: color-mix(in srgb, var(--danger) 18%, white);
+}
+
+.msg-retry.ghost {
+  background: transparent;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.msg-retry.ghost:hover {
+  opacity: 1;
+}
+
+/* ---------- 聊天：已停止标记 ---------- */
+/* 用户主动点了停止：内容保留，但标出来这是「我让它停的」，
+   而不是模型说到一半断了。 */
+.bubble-stopped {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* ---------- 页面标题区（PageHeader） ---------- */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.page-header-text {
+  min-width: 0;
+}
+
+.page-header-text h1 {
+  margin: 0;
+}
+
+.page-header-text .muted {
+  margin: 6px 0 0;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 空状态（EmptyState） ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 44px 20px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  margin-top: 16px;
+}
+
+.empty-state-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+  margin-bottom: 4px;
+}
+
+.empty-state h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 380px;
+  line-height: 1.6;
+}
+
+.empty-state-action {
+  margin-top: 8px;
+}
+
+/* ---------- 可点击的卡片入口（我的 → 系统设置） ---------- */
+.nav-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.nav-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.nav-card h2 {
+  margin: 0;
+}
+
+.nav-card .muted {
+  margin: 4px 0 0;
+}
+
+.nav-card > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.nav-card:hover > svg {
+  color: var(--accent);
+}
+
+/* ---------- 主题色块（外观卡片） ---------- */
+/* 原来六个主题只有名字，点之前不知道是什么颜色，只能逐个试。
+   改成「色点 + 名字」，一眼看出差别。 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.theme-swatch:hover {
+  background: var(--panel-2);
+}
+
+.theme-swatch.active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.theme-swatch-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.theme-swatch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appearance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.appearance-row label {
+  margin: 0;
+  flex: none;
+}
+
+.appearance-row input[type="color"] {
+  width: 48px;
+  height: 32px;
+  padding: 2px;
+  flex: none;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* ---------- 我的页：常用区两栏 ---------- */
+/* 2560 宽屏上原来内容锁在 1232px、左右各空 640px，
+   而卡片里又是单列纵向堆叠，一张 1232px 宽的卡片只放 4 个输入框。
+   这里让「身份」和「外观」并排，宽屏不浪费、窄屏自动落回单列。 */
+.me-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 16px;
+  /* 左栏「我的身份」比右栏「外观」高，默认 stretch 会让右卡被拉长、
+     内容顶部对齐后下面留一大片空白。改成 start 让右卡保持自身高度，
+     空白由外层背景承担，看起来更自然。 */
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .me-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 隐私与安全说明：一行小字，不占卡片，也不会被当成可点区域 */
+.me-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.me-note svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+/* ---------- 入口行（我的 → 系统设置 / 数据 / 关于） ---------- */
+/* 这三个都是「点进去」或「看一眼」的东西，原来各占一张大卡片，
+   五张同权卡片堆下来，页面看着像复制粘贴。
+   收成一行三个入口后，页面只剩「设置身份」和「去哪儿」两层。 */
+.entry-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.entry-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: background 120ms ease;
+}
+
+/* 竖分隔线：用左边框而不是 gap，避免出现两条并排的边 */
+.entry-item + .entry-item {
+  border-left: 1px solid var(--line);
+}
+
+.entry-item:hover {
+  background: var(--panel-2);
+}
+
+.entry-item-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.entry-item-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.entry-item-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.entry-item-text span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-item > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.entry-item:hover > svg {
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  /* 手机上横排三格会挤成一条，改成竖排，分隔线换成上边框 */
+  .entry-row {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-item + .entry-item {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}
+
 .chip {
   font-size: 12px;
   color: var(--muted);
@@ -455,15 +1932,125 @@ label {
 }
 
 /* ---------- 伴侣卡（首页） ---------- */
+/* 原来 320px 起、纵向堆叠，一个伴侣占掉一整块，3 个就要滚动。
+   改成更密的网格：窄屏 1 列、中屏 2 列、宽屏 3 列，一屏能扫到更多。
+
+   另外两个「撑满」规则解决大屏留白：只有 1~2 个伴侣时，
+   卡片不该挤在左上角、右边空一大片。 */
 .companions {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* 只有 1 个伴侣：单列，不再强行居中，
+   因为末尾会跟一张「新建」占位卡，居中会让两张卡左右分散 */
+.companions[data-count="1"] {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
+}
+
+/* 2 个伴侣：两列平分，不居中，避免两侧同时出现空档 */
+.companions[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 新建伴侣占位卡：填在网格末尾。
+   为什么加它：只有 1~2 个伴侣时，右侧和下大片空白，
+   页面看起来像「没加载完」。补一张虚线卡既填满版面，又给出下一步动作。 */
+.create-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 168px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: transparent;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.create-card:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+
+.create-card-plus {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-2);
+  margin-bottom: 2px;
+}
+
+.create-card strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.create-card span {
+  font-size: 12px;
 }
 
 .companion-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   position: relative;
+  padding: 14px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.companion-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* 搜索与排序：伴侣多于 3 个时才显示 */
+.companions-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.search-field {
+  position: relative;
+  /* 只定宽度，不定高度。
+     原来写 flex: 1 1 220px：横向布局时是宽度基准，
+     但移动端容器变 flex-direction: column 后，这个 220px 变成了高度，
+     父容器被撑到 220px，绝对定位的图标就居中到框外去了。 */
+  flex: 1 1 220px;
+  min-width: 0;
+  display: block;
+  align-self: flex-start;
+  width: 100%;
+  height: 40px;
+}
+
+.search-field svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  /* 图标自身不参与布局，避免影响输入框高度 */
+  line-height: 0;
+}
+
+.search-field input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.companions-sort {
+  flex: none;
+  width: auto;
+  min-width: 128px;
 }
 
 /* 批量管理：卡片左上角的勾选框 */
@@ -495,6 +2082,7 @@ label {
   gap: 12px;
   align-items: flex-start;
   color: inherit;
+  min-width: 0;
 }
 
 .card-info {
@@ -504,6 +2092,18 @@ label {
 
 .card-info h3 {
   margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+/* 关系定位：一行就够，超出省略，避免把卡片撑高 */
+.card-info .relationship {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .avatar {
@@ -560,12 +2160,20 @@ label {
 }
 
 .last-line {
-  margin: 6px 0 0;
-  color: var(--text);
+  /* 最后一句用两行，既能看到内容又不把卡片撑高；
+     比原来强制单行 ellipsis 更有信息量，也不会像三行那样参差不齐 */
+  margin: 8px 0 0;
+  color: var(--muted);
   font-size: 13px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.last-line.empty {
+  font-style: italic;
 }
 
 .card-actions {
@@ -573,6 +2181,33 @@ label {
   gap: 8px;
   position: relative;
   align-items: center;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* 主操作占满剩余宽度，「更多」收成一个图标按钮，降低视觉噪音 */
+.card-actions .btn.primary {
+  flex: 1;
+  text-align: center;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.icon-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
 }
 
 /* Radix 负责定位（Portal + side/align），这里只管外观 */
@@ -689,16 +2324,39 @@ label {
 }
 
 .skeleton {
-  background: var(--panel-2);
+  background: color-mix(in srgb, var(--text) 9%, var(--panel));
   border-radius: 50%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
 .skeleton-line {
   height: 12px;
   width: 60%;
   border-radius: 999px;
-  background: var(--panel-2);
+  /* 原来用 --panel-2 作底色，它本身就是浅粉，和页面背景几乎同色，
+     骨架屏看上去像没渲染。改成掺一点正文色的灰，才有「占位块」的感觉。 */
+  background: color-mix(in srgb, var(--text) 9%, var(--panel));
   margin: 6px 0;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* 轻微呼吸：告诉用户「在加载」而不是「画错了」 */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* 尊重系统的「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton-line {
+    animation: none;
+  }
 }
 
 .skeleton-line.short {
@@ -714,14 +2372,24 @@ label {
 .chat-panel {
   position: relative;
   min-width: 0;
+  /* 聊天列必须是可伸缩的纵向容器：
+     消息区吃满剩余高度，输入框才会贴在底部。
+     原来消息区写死 62vh，内容少时整块缩在上半屏，输入框飘在页面中间。 */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .messages {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--panel) 72%, transparent);
-  padding: 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 2px 12px;
   scroll-behavior: smooth;
+  /* 撑满剩余空间并内部滚动 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .bubble-content {
@@ -790,14 +2458,6 @@ label {
   border-color: var(--line);
   box-shadow: 0 8px 20px rgba(44, 36, 48, 0.12);
   z-index: 2;
-}
-
-.composer textarea {
-  flex: 1;
-  resize: none;
-  max-height: 120px;
-  min-height: 40px;
-  line-height: 1.5;
 }
 
 [data-sonner-toaster] {
@@ -967,6 +2627,39 @@ label {
   .nav {
     gap: 10px;
     font-size: 13px;
+  }
+
+  /* 搜索框独占一行，排序下拉跟在下面，避免挤成一条 */
+  .companions-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* 纵向布局里 flex-basis 会被当成「高度」：
+     .search-field 的 flex: 1 1 220px 会把父容器撑到 220px，
+     绝对定位的搜索图标就居中到输入框外面去了。
+     这里改回 0 0 auto，让高度只由 height 决定。 */
+  .search-field {
+    flex: 0 0 auto;
+    height: 40px;
+  }
+
+  .companions-sort {
+    width: 100%;
+  }
+
+  .page-header {
+    gap: 10px;
+  }
+
+  /* 标题区操作按钮：主按钮撑满，次要按钮（批量管理）按内容宽度，
+     否则两个按钮各占一半，「批量管理」这种低频操作会显得跟主操作一样重 */
+  .page-header-actions {
+    width: 100%;
+  }
+
+  .page-header-actions .btn.primary {
+    flex: 1;
   }
 
   .chat-layout {

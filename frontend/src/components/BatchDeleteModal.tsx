@@ -3,6 +3,7 @@ import { api } from "../api";
 import { toast } from "sonner";
 import Modal from "./Modal";
 import { explainErrorText } from "../lib/errors";
+import ErrorAlert from "./ErrorAlert";
 
 interface Props {
   /** 已选中的伴侣数量 */
@@ -99,7 +100,7 @@ export default function BatchDeleteModal({
           autoComplete="off"
         />
       </div>
-      {error && <div className="alert" style={{ marginTop: 8 }}>{error}</div>}
+      {error && <ErrorAlert message={error} variant="inline" />}
       <div className="toolbar" style={{ marginTop: 14 }}>
         <button className="primary" disabled={busy || !ready} onClick={() => void submit()}>
           {!rulesReady ? "加载确认规则…" : busy ? "删除中…" : `确认删除 ${count} 个`}

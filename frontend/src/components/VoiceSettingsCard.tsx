@@ -8,6 +8,7 @@ import { queries } from "../lib/queries";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../api";
+import ErrorAlert from "./ErrorAlert";
 
 const GUIDE_STEPS = [
   {
@@ -100,7 +101,7 @@ export default function VoiceSettingsCard() {
         语音对话需要单独的供应商：你说话它识别成文字，她回复时合成语音。Key 只存在本机，加密保存。
       </p>
 
-      {(error || providersQuery.error) && <div className="alert">{error || providersQuery.error?.message}</div>}
+      <ErrorAlert message={error || providersQuery.error?.message} variant="inline" />
 
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <h3>火山引擎（豆包语音）</h3>

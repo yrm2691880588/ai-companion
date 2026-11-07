@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import Modal from "./Modal";
+import ErrorAlert from "./ErrorAlert";
 
 interface Props {
   file: File | null;
@@ -98,7 +99,7 @@ function CropperDialog({ file, onCancel, onSave }: Props & { file: File }) {
         </>
       }
     >
-      {error && <div className="alert">{error}</div>}
+      {error && <ErrorAlert message={error} variant="inline" />}
 
       <div className="avatar-crop-box">
         {imageUrl && (

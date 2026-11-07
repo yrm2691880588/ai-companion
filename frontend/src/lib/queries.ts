@@ -25,6 +25,7 @@ export const queries = {
   messages: (id: number) => queryOptions({ queryKey: key("messages", id), queryFn: ({ signal }) => api.messages(id, signal) }),
   summary: (id: number) => queryOptions({ queryKey: key("summary", id), queryFn: ({ signal }) => api.summary(id, signal) }),
   memories: (id: number) => queryOptions({ queryKey: key("memories", id), queryFn: ({ signal }) => api.memories(id, signal) }),
+  personaVersions: (id: number) => queryOptions({ queryKey: key("persona-versions", id), queryFn: ({ signal }) => api.personaVersions(id, signal) }),
   templates: () => queryOptions({ queryKey: key("templates"), queryFn: ({ signal }) => api.templates(signal) }),
   scenarios: () => queryOptions({ queryKey: key("scenarios"), queryFn: ({ signal }) => api.scenarios(signal) }),
   run: (id: number) => queryOptions({ queryKey: key("run", id), queryFn: ({ signal }) => api.getRun(id, signal) }),

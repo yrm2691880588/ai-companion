@@ -2,7 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { queries } from "../lib/queries";
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Send } from "lucide-react";
 import { api, streamEvents } from "../api";
+import PageHeader from "../components/PageHeader";
+import ErrorAlert from "../components/ErrorAlert";
+import Loading from "../components/Loading";
 import type { Review, Run } from "../lib/types";
 
 interface Line {
@@ -101,55 +105,77 @@ export default function RoleplayPage() {
 
   return (
     <div>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h1>演练</h1>
-          <p className="muted">
-            {companion ? `${companion.name} 陪你练` : "加载中…"} · 结束后会跳出角色给复盘
-          </p>
-        </div>
-        <Link className="btn ghost" to={`/companions/${companionId}/chat`}>
-          回到对话
-        </Link>
-      </div>
+      <PageHeader
+        title="演练"
+        description={
+          companion
+            ? `${companion.name} 陪你练，结束后会跳出角色给复盘。`
+            : "加载中…"
+        }
+        actions={
+          <Link className="btn ghost" to={`/companions/${companionId}/chat`}>
+            回到对话
+          </Link>
+        }
+      />
 
-      {(error || companionQuery.error || scenariosQuery.error) && <div className="alert">{error || companionQuery.error?.message || scenariosQuery.error?.message}</div>}
+      <ErrorAlert
+        message={error || companionQuery.error?.message || scenariosQuery.error?.message}
+        onDismiss={error ? () => setError("") : undefined}
+        onRetry={scenariosQuery.isError ? () => void scenariosQuery.refetch() : undefined}
+      />
 
-      {!run && (
-        <div className="grid" style={{ marginTop: 12 }}>
+      {!run && scenariosQuery.isPending && <Loading lines={3} avatar label="加载场景" card />}
+
+      {!run && !scenariosQuery.isPending && (
+        <div className="grid scenario-grid" style={{ marginTop: 16 }}>
           {scenarios.map((scenario) => (
-            <div className="card" key={scenario.key}>
-              <span className="chip">
-                {scenario.category} · 难度 {scenario.difficulty}/5
-              </span>
-              <h3 style={{ marginTop: 8 }}>{scenario.title}</h3>
-              <p className="muted">AI 扮演：{scenario.role}</p>
-              <p className="muted">你的目标：{scenario.goal}</p>
-              <div className="toolbar">
-                <button className="primary" onClick={() => void start(scenario.key)}>
-                  开始演练
-                </button>
+            <div className="card scenario-card" key={scenario.key}>
+              <div className="scenario-head">
+                <span className="chip">{scenario.category}</span>
+                {/* 难度用圆点表示，比「难度 3/5」更直观 */}
+                <span className="difficulty" title={`难度 ${scenario.difficulty}/5`}>
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <span
+                      key={index}
+                      className={index < scenario.difficulty ? "dot on" : "dot"}
+                      aria-hidden="true"
+                    />
+                  ))}
+                  <span className="sr-only">难度 {scenario.difficulty}/5</span>
+                </span>
               </div>
+              <h3>{scenario.title}</h3>
+              <dl className="scenario-meta">
+                <dt>她扮演</dt>
+                <dd>{scenario.role}</dd>
+                <dt>你的目标</dt>
+                <dd>{scenario.goal}</dd>
+              </dl>
+              <button className="btn primary" onClick={() => void start(scenario.key)}>
+                开始演练
+              </button>
             </div>
           ))}
         </div>
       )}
 
       {run && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 16 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <p className="muted">
-              场景 {run.scenario_key} · 已进行 {run.turns_played}/{run.max_turns} 轮 · 状态{" "}
-              {run.status}
+              {/* 原来直接显示 scenario_key 和 status 原始英文值 */}
+              第 {run.turns_played}/{run.max_turns} 轮
+              {run.status === "active" ? " · 进行中" : run.status === "finished" ? " · 已结束" : ""}
             </p>
             <div className="toolbar">
               {!review && (
-                <button className="primary" onClick={() => void finish()}>
+                <button className="btn primary" onClick={() => void finish()}>
                   结束并复盘
                 </button>
               )}
               <button
-                className="ghost"
+                className="btn ghost"
                 onClick={() => {
                   setRun(null);
                   setLines([]);
@@ -174,6 +200,7 @@ export default function RoleplayPage() {
               <input
                 value={draft}
                 placeholder="轮到你说了…"
+                aria-label="输入你的回应"
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
@@ -183,12 +210,17 @@ export default function RoleplayPage() {
                 }}
               />
               {streaming ? (
-                <button className="danger" onClick={() => abortRef.current?.abort()}>
+                <button className="btn danger composer-send" onClick={() => abortRef.current?.abort()} aria-label="停止">
                   停止
                 </button>
               ) : (
-                <button className="primary" onClick={() => void send()}>
-                  发送
+                <button
+                  className="btn primary composer-send"
+                  onClick={() => void send()}
+                  disabled={!draft.trim()}
+                  aria-label="发送"
+                >
+                  <Send size={17} aria-hidden="true" />
                 </button>
               )}
             </div>

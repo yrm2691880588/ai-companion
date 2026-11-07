@@ -1,15 +1,20 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queries } from "../lib/queries";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { CloudOff, MessageCircle, MoreHorizontal, Plus, Search, UserRound } from "lucide-react";
 import { api } from "../api";
 import AvatarCropper from "../components/AvatarCropper";
 import BatchDeleteModal from "../components/BatchDeleteModal";
+import EmptyState from "../components/EmptyState";
+import ErrorAlert from "../components/ErrorAlert";
 import Menu from "../components/Menu";
 import Modal from "../components/Modal";
+import PageHeader from "../components/PageHeader";
 import { downloadPersona } from "../lib/persona-export";
+import { relativeTime } from "../lib/format";
 import type { Companion } from "../lib/types";
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -32,28 +37,27 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-function relativeTime(iso?: string | null): string {
-  if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
-  const date = new Date(iso);
-  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
-}
-
 export default function CompanionsPage() {
   const client = useQueryClient();
   const listQuery = useQuery(queries.companions());
-  const items = listQuery.data ?? [];
+  // 用空数组兜底时每次渲染都是新引用，会让下面依赖 items 的 useMemo 失效；
+  // 用 useMemo 稳定引用，只有数据真的变了才重算
+  const items = useMemo(() => listQuery.data ?? [], [listQuery.data]);
   const latestQueries = useQueries({ queries: items.map(item => queries.latest(item.id)) });
-  const latests = Object.fromEntries(items.map((item, index) => [item.id, latestQueries[index].data]));
+  // 同理：Object.fromEntries 每次都产生新对象，稳定引用后再交给下面的排序 useMemo
+  const latests = useMemo(
+    () => Object.fromEntries(items.map((item, index) => [item.id, latestQueries[index].data])),
+    [items, latestQueries],
+  );
   const loading = listQuery.isPending;
-  const loadError = listQuery.error?.message || latestQueries.find(query => query.error)?.error?.message;
+  /**
+   * 只有「伴侣列表」本身失败才值得整页报错。
+   *
+   * 之前把 latestQueries 的错误也拼进来：只要某个伴侣的最后一条消息取不到
+   * （比如刚好被删掉），整页顶上就出现一条「伴侣不存在」，
+   * 用户既看不懂，也没法处理——真正有用的信息是列表还在、还能点进去。
+   */
+  const loadError = listQuery.error?.message;
   const [error, setError] = useState("");
   const [menuId, setMenuId] = useState<number | null>(null);
   const navigate = useNavigate();
@@ -70,6 +74,33 @@ export default function CompanionsPage() {
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // 搜索与排序：伴侣少于 3 个时不显示，避免空荡的输入框占地方
+  const [keyword, setKeyword] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "name" | "created">("recent");
+
+  /**
+   * 过滤 + 排序。
+   *
+   * 排序按「最近聊过」优先：这是回访用户最常用的入口，找不到上次聊的那个才是真痛点。
+   * 没有消息时退回伴侣自己的更新时间，保证新伴侣不会永远沉底。
+   */
+  const visibleItems = useMemo(() => {
+    const text = keyword.trim().toLowerCase();
+    const matched = text
+      ? items.filter((item) =>
+          [item.name, item.persona.identity, item.persona.relationship]
+            .filter(Boolean)
+            .some((field) => String(field).toLowerCase().includes(text)),
+        )
+      : items;
+    const timeOf = (item: Companion) =>
+      new Date(latests[item.id]?.created_at || item.updated_at).getTime();
+    return [...matched].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name, "zh-Hans-CN");
+      if (sortBy === "created") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return timeOf(b) - timeOf(a);
+    });
+  }, [items, latests, keyword, sortBy]);
 
   function updateCompanion(updated: Companion) {
     client.setQueryData(queries.companion(updated.id).queryKey, updated);
@@ -181,33 +212,59 @@ export default function CompanionsPage() {
 
   return (
     <div>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <h1>我的伴侣</h1>
-          <p className="muted">点一张卡就能继续上次的对话。</p>
+      <PageHeader
+        title="我的伴侣"
+        description="点一张卡就能继续上次的对话。"
+        actions={
+          <>
+            {items.length > 0 && (
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setBatchMode(!batchMode);
+                  setSelectedIds([]);
+                  // 取一次后端上限，超过时自动分批
+                  void api
+                    .batchDeleteRules()
+                    .then((rules) => setBatchLimit(rules.max_batch))
+                    .catch(() => undefined);
+                }}
+              >
+                {batchMode ? "退出批量" : "批量管理"}
+              </button>
+            )}
+            <Link className="btn primary" to="/create">
+              <Plus size={16} aria-hidden="true" />
+              创建伴侣
+            </Link>
+          </>
+        }
+      />
+
+      {items.length > 2 && (
+        <div className="companions-toolbar">
+          <div className="search-field">
+            <Search size={16} aria-hidden="true" />
+            <input
+              type="search"
+              value={keyword}
+              placeholder="搜索名字、身份或关系"
+              aria-label="搜索伴侣"
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+          </div>
+          <select
+            className="companions-sort"
+            value={sortBy}
+            aria-label="排序方式"
+            onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+          >
+            <option value="recent">最近聊过</option>
+            <option value="name">按名字</option>
+            <option value="created">按创建时间</option>
+          </select>
         </div>
-        <div className="row" style={{ gap: 8 }}>
-          {items.length > 0 && (
-            <button
-              className="btn ghost"
-              onClick={() => {
-                setBatchMode(!batchMode);
-                setSelectedIds([]);
-                // 取一次后端上限，超过时自动分批
-                void api
-                  .batchDeleteRules()
-                  .then((rules) => setBatchLimit(rules.max_batch))
-                  .catch(() => undefined);
-              }}
-            >
-              {batchMode ? "退出批量" : "批量管理"}
-            </button>
-          )}
-          <Link className="btn primary" to="/create">
-            创建伴侣
-          </Link>
-        </div>
-      </div>
+      )}
 
       {batchMode && (
         <div className="card" style={{ marginTop: 12 }}>
@@ -237,9 +294,13 @@ export default function CompanionsPage() {
         </div>
       )}
 
-      {(error || loadError) && <div className="alert">{error || loadError}</div>}
+      <ErrorAlert
+        message={error || loadError}
+        onDismiss={error ? () => setError("") : undefined}
+        onRetry={listQuery.isError ? () => void listQuery.refetch() : undefined}
+      />
       {loading ? (
-        <div className="grid" style={{ marginTop: 16 }}>
+        <div className="grid companions" data-count="2" style={{ marginTop: 16 }}>
           {[0, 1].map((key) => (
             <div className="card skeleton-card" key={key}>
               <div className="skeleton avatar" />
@@ -248,17 +309,48 @@ export default function CompanionsPage() {
             </div>
           ))}
         </div>
-      ) : listQuery.isError ? null : items.length === 0 ? (
-        <div className="card empty-card" style={{ marginTop: 16 }}>
-          <h3>还没有伴侣</h3>
-          <p className="muted">用一句话描述你想要的人，或从 5 类官方模板开始。</p>
-          <Link className="btn primary" to="/create">
-            去创建
-          </Link>
-        </div>
+      ) : listQuery.isError ? (
+        /* 列表加载失败时不要留一片空白：用户会以为是「没有伴侣」。
+           给一个明确的失败态 + 重试入口。 */
+        <EmptyState
+          icon={CloudOff}
+          title="没能加载伴侣列表"
+          description="可能是服务暂时不可用，也可能是网络断了。"
+          action={
+            <button className="btn primary" onClick={() => void listQuery.refetch()}>
+              重新加载
+            </button>
+          }
+        />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={UserRound}
+          title="还没有伴侣"
+          description="用一句话描述你想要的人，或从 5 类官方模板开始。"
+          action={
+            <Link className="btn primary" to="/create">
+              去创建
+            </Link>
+          }
+        />
+      ) : visibleItems.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title={`没有找到「${keyword.trim()}」`}
+          description="换个名字、身份或关系里的关键词试试。"
+          action={
+            <button className="btn ghost" onClick={() => setKeyword("")}>
+              清除搜索
+            </button>
+          }
+        />
       ) : (
-        <div className="grid companions" style={{ marginTop: 16 }}>
-          {items.map((item) => {
+        <div
+          className="grid companions"
+          data-count={Math.min(visibleItems.length, 3)}
+          style={{ marginTop: 16 }}
+        >
+          {visibleItems.map((item) => {
             const latest = latests[item.id];
             const preview = latest?.content
               ? latest.role === "assistant"
@@ -304,20 +396,21 @@ export default function CompanionsPage() {
                     <span className="avatar-badge">{avatarBusy && avatarTarget === item.id ? "…" : "换"}</span>
                   </div>
                   <div className="card-info">
-                    <div className="row" style={{ justifyContent: "space-between" }}>
+                    <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
                       <h3>{item.name}</h3>
-                      <span className="muted">
+                      <span className="muted" style={{ flex: "none" }}>
                         {relativeTime(latest?.created_at || item.updated_at)}
                       </span>
                     </div>
-                    <p className="muted">
+                    <p className="relationship">
                       {item.persona.relationship || item.persona.identity}
                     </p>
-                    <p className="last-line">{preview}</p>
+                    <p className={`last-line${latest?.content ? "" : " empty"}`}>{preview}</p>
                   </div>
                 </Link>
                 <div className="card-actions">
                   <Link className="btn primary" to={`/companions/${item.id}/chat`}>
+                    <MessageCircle size={15} aria-hidden="true" />
                     {latest?.content ? "继续聊" : "开始聊天"}
                   </Link>
                   <Menu
@@ -325,8 +418,12 @@ export default function CompanionsPage() {
                     open={menuId === item.id}
                     onOpenChange={(open) => setMenuId(open ? item.id : null)}
                     trigger={
-                      <button className="btn ghost" onClick={() => setMenuId(item.id)}>
-                        更多
+                      <button
+                        className="icon-btn"
+                        aria-label={`${item.name} 的更多操作`}
+                        onClick={() => setMenuId(item.id)}
+                      >
+                        <MoreHorizontal size={18} aria-hidden="true" />
                       </button>
                     }
                     items={[
@@ -372,6 +469,14 @@ export default function CompanionsPage() {
               </div>
             );
           })}
+          {/* 网格末尾的新建占位卡：伴侣少时填满版面，同时是下一步动作 */}
+          <Link className="create-card" to="/create">
+            <span className="create-card-plus">
+              <Plus size={20} aria-hidden="true" />
+            </span>
+            <strong>新建伴侣</strong>
+            <span>一句话就能开始</span>
+          </Link>
         </div>
       )}
 

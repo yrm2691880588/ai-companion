@@ -5,7 +5,6 @@ const BASE = "http://127.0.0.1:8000";
 const PHONE = "TEST_PHONE_REDACTED";
 
 const results = [];
-let derivedToCleanup = null;
 function check(name, ok, detail = "") {
   results.push({ name, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? " - " + detail : ""}`);
@@ -55,32 +54,63 @@ if (firstCompanionId) {
   check("人设字段渲染", inputs >= 5, `输入框 ${inputs} 个`);
   await page.getByRole("button", { name: "编辑人设" }).click();
   await page.waitForTimeout(300);
-  const deriveButton = page.getByRole("button", { name: /创建新伴侣/ });
-  check("编辑后出现衍生按钮", (await deriveButton.count()) > 0);
-  check(
-    "按钮文案不是“保存”",
-    !(await page.getByRole("button", { name: /^保存人设$/ }).count()),
-  );
+  // 2026-11 起改为「原地保存」：改人设不再新建伴侣，而是生成新版本。
+  // 这里验证新行为，同时确认「基于此版再造一个」作为高级操作仍然存在。
+  const saveButton = page.getByRole("button", { name: "保存人设" });
+  const deriveButton = page.getByRole("button", { name: /基于此版再造一个/ });
+  check("编辑后出现保存按钮", (await saveButton.count()) > 0);
+  check("保留了再造一个的入口", (await deriveButton.count()) > 0);
 
-  // 真实点击衍生：改名字后创建，验证跳转与新伴侣
-  const nameInput = page.locator("#p-name");
-  const newName = `测试衍生${Date.now() % 100000}`;
-  await nameInput.fill(newName);
-  await deriveButton.click();
-  await page.waitForTimeout(3000);
-  await page.waitForURL(/\/companions\/\d+\/chat/, { timeout: 15000 });
-  check("衍生后跳转到聊天页", true, page.url());
-  const derivedId = Number(page.url().match(/\/companions\/(\d+)\/chat/)?.[1] ?? 0);
-  check("衍生伴侣 id 有效", derivedId > 0, String(derivedId));
-  const derived = await page.evaluate(async (id) => {
+  // 记录改动前的版本号
+  const beforeVersion = await page.evaluate(async (id) => {
     const response = await fetch(`/v1/companions/${id}`, { credentials: "same-origin" });
-    return response.ok ? await response.json() : null;
-  }, derivedId);
-  check("衍生伴侣名字正确", derived?.name === newName, String(derived?.name));
-  check("衍生来源正确", derived?.derived_from === firstCompanionId, String(derived?.derived_from));
-  // 不在此处删除：聊天页刚自动建了会话并可能正在请求开场白，
-  // 删除会产生在途 404。放到全部检查结束后统一清理。
-  derivedToCleanup = { id: derivedId, name: newName };
+    return (await response.json()).current_version;
+  }, firstCompanionId);
+
+  // 改说话风格后原地保存
+  const styleInput = page.locator("#p-style");
+  const newStyle = `页面验收测试：更短的句子，一次只问一个问题。${Date.now() % 10000}`;
+  await styleInput.fill(newStyle);
+  await saveButton.click();
+  await page.waitForTimeout(2500);
+
+  // 关键断言：URL 没变（没有跳到新伴侣），版本号 +1
+  check("保存后还在同一个人设页", page.url().includes(`/companions/${firstCompanionId}/persona`), page.url());
+  const afterSave = await page.evaluate(async (id) => {
+    const response = await fetch(`/v1/companions/${id}`, { credentials: "same-origin" });
+    return await response.json();
+  }, firstCompanionId);
+  check("版本号递增", afterSave.current_version === beforeVersion + 1, `${beforeVersion} → ${afterSave.current_version}`);
+  check("改动已生效", afterSave.persona.speaking_style === newStyle, String(afterSave.persona.speaking_style).slice(0, 20));
+  check("伴侣没变多（不是衍生）", afterSave.id === firstCompanionId);
+
+  // 版本历史里能看到旧版本
+  const versions = await page.evaluate(async (id) => {
+    const response = await fetch(`/v1/companions/${id}/personas`, { credentials: "same-origin" });
+    return (await response.json()).map((v) => v.version);
+  }, firstCompanionId);
+  check("版本历史保留旧版本", versions.length >= 2 && versions.includes(beforeVersion), versions.join(","));
+
+  // 还原到上一版：应生成更新的版本，而不是把版本号拨回去
+  const restored = await page.evaluate(
+    async ({ id, version }) => {
+      const response = await fetch(`/v1/companions/${id}/personas/${version}/restore`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      return response.ok ? await response.json() : null;
+    },
+    { id: firstCompanionId, version: beforeVersion },
+  );
+  check("还原生成新版本", restored?.current_version === afterSave.current_version + 1, String(restored?.current_version));
+  check("还原后内容回到旧版", restored?.persona.speaking_style !== newStyle);
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
+  check(
+    "页面上能看到版本历史区块",
+    (await page.getByRole("heading", { name: /历史版本/ }).count()) > 0,
+  );
   await page.screenshot({ path: "tmp/verify-persona.png", fullPage: true });
 }
 
@@ -204,19 +234,6 @@ if ((await cropper.count()) > 0) {
   await page.getByRole("button", { name: "取消" }).click();
   await page.waitForTimeout(300);
   check("取消后弹窗关闭", (await page.locator(".reactEasyCrop_Container").count()) === 0);
-}
-
-if (derivedToCleanup) {
-  await page.waitForTimeout(1500);
-  await page.evaluate(
-    async ({ id, name }) => {
-      await fetch(`/v1/companions/${id}?confirm_name=${encodeURIComponent(name)}`, {
-        method: "DELETE",
-        credentials: "same-origin",
-      });
-    },
-    derivedToCleanup,
-  );
 }
 
 check(

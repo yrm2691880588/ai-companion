@@ -14,6 +14,7 @@ import type {
   Memory,
   Message,
   Persona,
+  PersonaVersion,
   Provider,
   ProviderSetting,
   Quota,
@@ -216,10 +217,40 @@ export const api = {
     });
     return result.persona;
   },
+  /**
+   * 让 AI 改写人设草稿里的某一个维度，返回建议值。
+   * 不落库：用户点「采用」后由调用方写回表单。
+   */
+  async refinePersonaDimension(
+    persona: Persona,
+    dimension: string,
+    hint: string | null,
+  ): Promise<{ value: unknown; modelKey: string; costCny: number }> {
+    const result = await request<{
+      dimension: string;
+      value: unknown;
+      model_key: string;
+      cost_cny: number;
+    }>("/v1/personas/refine", {
+      method: "POST",
+      body: JSON.stringify({ persona, dimension, hint }),
+    });
+    return { value: result.value, modelKey: result.model_key, costCny: result.cost_cny };
+  },
   async savePersona(id: number, persona: Persona): Promise<Companion> {
     return request<Companion>(`/v1/companions/${id}/persona`, {
       method: "PUT",
       body: JSON.stringify({ persona }),
+    });
+  },
+  /** 人设的历史版本，最新的在前。 */
+  async personaVersions(id: number, signal?: AbortSignal): Promise<PersonaVersion[]> {
+    return request<PersonaVersion[]>(`/v1/companions/${id}/personas`, { signal });
+  },
+  /** 把某个历史版本还原成新版本（历史不丢）。 */
+  async restorePersonaVersion(id: number, version: number): Promise<Companion> {
+    return request<Companion>(`/v1/companions/${id}/personas/${version}/restore`, {
+      method: "POST",
     });
   },
   async setAvatar(id: number, avatar: string | null): Promise<Companion> {
@@ -260,6 +291,21 @@ export const api = {
   },
   async messages(sessionId: number, signal?: AbortSignal): Promise<Message[]> {
     return request<Message[]>(`/v1/sessions/${sessionId}/messages?limit=100`, { signal });
+  },
+  /**
+   * 取某个 seq 之前的更早消息（升序返回）。
+   * 后端按 seq 倒序取 limit 条再翻转，所以拿到的正好是「紧挨着的那一批」。
+   */
+  async olderMessages(
+    sessionId: number,
+    beforeSeq: number,
+    limit = 30,
+    signal?: AbortSignal,
+  ): Promise<Message[]> {
+    return request<Message[]>(
+      `/v1/sessions/${sessionId}/messages?before_seq=${beforeSeq}&limit=${limit}`,
+      { signal },
+    );
   },
   async summary(sessionId: number, signal?: AbortSignal): Promise<Summary> {
     return request<Summary>(`/v1/sessions/${sessionId}/summary`, { signal });

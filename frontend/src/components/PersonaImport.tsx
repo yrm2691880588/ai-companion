@@ -4,6 +4,7 @@ import Modal from "./Modal";
 import PersonaForm from "./PersonaForm";
 import { personaSchema } from "../lib/forms";
 import type { Companion, Persona } from "../lib/types";
+import ErrorAlert from "./ErrorAlert";
 
 
 interface Props {
@@ -98,7 +99,7 @@ export default function PersonaImportButton({ onCreated }: Props) {
             </>
           }
         >
-          {error && <div className="alert">{error}</div>}
+          {error && <ErrorAlert message={error} variant="inline" />}
           <div className="import-form">
             <PersonaForm formId="import-persona" value={draft} onSubmit={create} disabled={busy} />
           </div>

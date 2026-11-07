@@ -11,6 +11,7 @@ import { api } from "../api";
 import Modal from "./Modal";
 import type { DiscoveredModel, Provider } from "../lib/types";
 import { explainErrorText } from "../lib/errors";
+import ErrorAlert from "./ErrorAlert";
 
 interface Props {
   providers: Provider[];
@@ -125,7 +126,7 @@ export default function ProviderSettingsList({ providers }: Props) {
 
   return (
     <div>
-      {(error || settingsQuery.error) && <div className="alert">{error || settingsQuery.error?.message}</div>}
+      <ErrorAlert message={error || settingsQuery.error?.message} variant="inline" />
       <p className="muted">
         点击供应商卡片配置 API Key 与地址。Key 只保存在本机，加密存储，不会显示明文。
       </p>
@@ -186,7 +187,7 @@ export default function ProviderSettingsList({ providers }: Props) {
           }
         >
           <form id="provider-settings" noValidate onSubmit={handleSubmit(save)}>
-          {(error || settingsQuery.error) && <div className="alert">{error || settingsQuery.error?.message}</div>}
+          <ErrorAlert message={error || settingsQuery.error?.message} variant="inline" />
           <label htmlFor="provider-key">API Key</label>
           <input
             id="provider-key"
@@ -203,7 +204,7 @@ export default function ProviderSettingsList({ providers }: Props) {
             </button>
           </div>
           {probeResult && <div className="notice">{probeResult}</div>}
-          {discoverError && <div className="alert">{discoverError}</div>}
+          <ErrorAlert message={discoverError} variant="inline" />
           {discovered.length > 0 && (
             <div className="discovered">
               <p className="muted">

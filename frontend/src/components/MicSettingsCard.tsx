@@ -8,6 +8,7 @@ import {
 } from "../lib/mic";
 import { explainError } from "../lib/errors";
 import type { MicDevice } from "../lib/mic";
+import ErrorAlert from "./ErrorAlert";
 
 /**
  * 麦克风选择：默认跟随系统，可手动指定某个输入设备。
@@ -109,7 +110,7 @@ export default function MicSettingsCard() {
         （例如 Voicemeeter、NVIDIA Broadcast），换一个真实麦克风即可。
       </p>
 
-      {error && <div className="alert">{error}</div>}
+      {error && <ErrorAlert message={error} variant="inline" />}
 
       <div className="field-grid">
         <div>

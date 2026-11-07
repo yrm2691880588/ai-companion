@@ -36,6 +36,13 @@ export interface Template {
   persona: Persona;
 }
 
+/** 人设的一个历史版本。 */
+export interface PersonaVersion {
+  version: number;
+  persona: Persona;
+  created_at: string;
+}
+
 export interface Session {
   id: number;
   companion_id: number;
