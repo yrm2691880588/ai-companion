@@ -220,10 +220,11 @@ Invoke-RestMethod "http://127.0.0.1:8000/v1/me/usage/models?days=7" -Headers @{ 
 | 类型 | 位置 | 说明 |
 |---|---|---|
 | 术语表 | [GLOSSARY.md](GLOSSARY.md) | 全项目唯一术语真源，新概念先在此登记 |
-| 架构决策 | [docs/adr/](docs/adr/) | 0001–0019，主体 0001–0013，语音 0014–0019 |
+| 架构决策 | [docs/adr/](docs/adr/) | 0001–0020，主体 0001–0013，语音 0014–0019，人设原地编辑 0020（取代 0001） |
 | 功能规格 | [docs/specs/](docs/specs/) | 0001 首次体验、0002 语音对话 |
 | 工单 | [docs/tickets/](docs/tickets/) | 0001 P0 首批、0002 语音 |
-| **待办与优先级** | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | **当前待办的真源**：已完成、待办、已知债务、非目标、基线 |
+| **待办与优先级** | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | **全项目待办真源**：已完成、待办、已知债务、非目标、基线 |
+| 前端界面待办 | [docs/roadmap/0004-前端界面待办.md](docs/roadmap/0004-前端界面待办.md) | 前端界面范围的三份旧清单合并版（49 条待办、7 个批次） |
 
 ### 能力说明（当前有效）
 
