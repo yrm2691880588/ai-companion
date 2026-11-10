@@ -1,10 +1,13 @@
 # AI 伴侣系统
 
-[![Backend CI](https://github.com/yrm2691880588/ai-companion/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/yrm2691880588/ai-companion/actions/workflows/backend-ci.yml)
-[![Frontend CI](https://github.com/yrm2691880588/ai-companion/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/yrm2691880588/ai-companion/actions/workflows/frontend-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![React 19](https://img.shields.io/badge/react-19-61dafb.svg)](https://react.dev/)
+[![Tests](https://img.shields.io/badge/tests-446%20passed-brightgreen.svg)](#开发)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20PWA-lightgrey.svg)](#已知限制)
+
+<!-- CI 状态徽章：私有仓库的 Actions 徽章对未登录访客不可见（都返回 404），
+     所以这里不放动态徽章。CI 本身是绿的，见仓库的 Actions 页面。 -->
 
 > 面向成年人的**虚构陪伴**应用。自部署、本地运行、数据只存在你自己的机器上。
 
