@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.domain.auth import InMemoryAuthRepository
 from app.domain.system_settings import InMemorySystemSettingsRepository
-from app.main import create_app
+from tests.support import build_test_app
 
 
 def build_client(
@@ -21,8 +21,10 @@ def build_client(
         sms_debug=True,
         admin_phones=admin_phones,
     )
+    # 用共享工厂补齐所有仓储：只传 auth 与 settings 时，其余会去连真实
+    # PostgreSQL，在 CI（没有数据库）上就会失败。
     return TestClient(
-        create_app(
+        build_test_app(
             settings,
             auth_repo=repo,
             system_settings_repo=settings_repo,

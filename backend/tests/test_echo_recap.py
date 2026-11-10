@@ -4,16 +4,13 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings
-from app.domain.chat import InMemoryChatRepository
-from app.domain.companions import InMemoryCompanionRepository, LLMResult
+from app.domain.companions import LLMResult
 from app.domain.memory import InMemoryMemoryRepository
 from app.domain.persona import Persona
-from app.domain.quota import InMemoryQuotaRepository
 from app.domain.templates import TEMPLATES, InMemoryTemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import ChatChunk, Usage
-from app.main import create_app
+from tests.support import build_test_app
 
 PERSONA = Persona.model_validate(
     {
@@ -43,15 +40,13 @@ class FakeStreamer:
 
 def build():
     memories = InMemoryMemoryRepository()
-    app = create_app(
-        Settings(env="test", _env_file=None),  # type: ignore[call-arg]
-        companion_repo=InMemoryCompanionRepository(),
+    # 用共享工厂补齐所有仓储：只传一部分时，没传的会去连真实 PostgreSQL，
+    # 在 CI（没有数据库）上就会失败。
+    app = build_test_app(
         template_repo=InMemoryTemplateRepository(TEMPLATES),
-        chat_repo=InMemoryChatRepository(),
         chat_streamer=FakeStreamer(),
         llm_client=FakeLLM(),
         memory_repo=memories,
-        quota_repo=InMemoryQuotaRepository(),
     )
     return TestClient(app), memories
 
