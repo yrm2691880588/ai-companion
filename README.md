@@ -1,272 +1,223 @@
-# AI 伴侣系统 V1.0
+# AI 伴侣系统
 
-多角色 AI 伴侣平台：一句话生成 7 维人设、模板库、多伴侣隔离、流式对话、长期记忆、长对话压缩、社交演练。
-后端为 Python/FastAPI 模块化单体，模型层可插拔（默认 DeepSeek 官方 1M 上下文，支持多家预设与本地模型）。
+[![Backend CI](https://github.com/yrm2691880588/ai-companion/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/yrm2691880588/ai-companion/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/yrm2691880588/ai-companion/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/yrm2691880588/ai-companion/actions/workflows/frontend-ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![React 19](https://img.shields.io/badge/react-19-61dafb.svg)](https://react.dev/)
 
-## 当前进度（V1.2 收尾）
+> 面向成年人的**虚构陪伴**应用。自部署、本地运行、数据只存在你自己的机器上。
 
-| 模块 | 状态 |
-|---|---|
-| 模型网关（OpenAI/Anthropic 适配、SSE 解析、错误归一） | ✅ 已完成并有测试 |
-| 模型注册表 + 9 类预设 + 任务路由 + 降级链 | ✅ 已完成并有测试 |
-| 定价与成本预算（高峰/空闲、缓存命中、成本倒推 token 上限） | ✅ 已完成并有测试 |
-| 供应商密钥信封加密、SSRF 防护 | ✅ 已完成并有测试 |
-| 模型层数据表与迁移（5 张表） | ✅ 已在真实 Postgres(pgvector 0.8.7) 上跑通 |
-| 调用记账（llm_calls，含失败尝试）与用量统计接口 | ✅ 已落库，实测 10 次调用可查 |
-| 人设 7 维 Schema + 校验 + 提示词编译 | ✅ 已完成（[说明](docs/人设Schema与伴侣接口.md)） |
-| 一句话生成人设（真实 DeepSeek 生成并落库） | ✅ 已跑通，示例见文档 |
-| 伴侣创建 / 列表 / 详情 / 改人设（版本化）/ 单维重写 | ✅ 接口与测试完成 |
-| 模板库（5 类 × 2 个）+ 从模板创建 + 删除伴侣 | ✅ 真实库验证通过 |
-| 对话主链路：会话/消息/SSE/人设注入/历史承接 | ✅ 真实 DeepSeek 两轮对话验证（[说明](docs/对话接口与SSE.md)） |
-| 长期记忆：自动抽取/去重/跨会话召回/可看可删/总开关 | ✅ 真实链路验证（[说明](docs/记忆与上下文.md)） |
-| 上下文压缩：预算裁剪 + 早期对话摘要 + 摘要查看 | ✅ 真实链路验证（[说明](docs/上下文压缩.md)） |
-| 演练模式：5 个场景 + 扮演 + 回合上限 + 复盘 | ✅ 真实链路验证（[说明](docs/演练与安全.md)） |
-| 安全兜底：危机识别 + 角色口吻提示 + 事件留痕 | ✅ 单测与接口测试 |
-| 每日额度：60 轮/日、失败返还、额度查询、前端提示 | ✅ 真库原子计数验证（[说明](docs/额度与内容安全.md)） |
-| 登录：手机验证码 + httpOnly Cookie 会话 | ✅ 真库验证（[说明](docs/登录与账号.md)） |
-| 强制登录：未登录自动跳登录页，匿名数据可迁移 | ✅ 已验证（[说明](docs/登录与账号.md)） |
-| 内容边界：成年人自愿亲密放开，仅保留未成年/非自愿/违法等红线 | ✅ 真实模型验证（[说明](docs/内容边界与成年模式.md)） |
-| 人设生成忠实于用户描述 + 伴侣头像上传 | ✅ 真实模型/真库验证（[说明](docs/伴侣头像与人设忠实度.md)） |
-| 删除伴侣：软删 + 异步硬清 + 补偿对账 | ✅ 真库验证全部归零（[说明](docs/删除与数据清理.md)） |
-| 批量删除伴侣（勾选多个 + 输入确认） | ✅ 页面验收 15 项通过 |
-| P1：重新生成（原地替换）+ 数据导出 | ✅ 真实链路验证（[对话说明](docs/对话接口与SSE.md)） |
-| 数据导入（按 ULID 去重） | ✅ 导出 14 个再导回：新建 0、跳过 14 |
-| 整库备份 / 恢复 | ✅ `scripts/backup_db.py`，22 表往返一致 |
-| **语音输入**（说话转文字，VAD 自动判断说完） | ✅ 真实账号 + 真实麦克风验证（[说明](docs/语音功能.md)） |
-| **麦克风设备选择**（含试音电平） | ✅ 规避虚拟设备静音问题 |
-| **语音输出**（合成 + 流式分段播报） | ✅ 真实账号验证，用户确认能听到（[说明](docs/语音功能.md)） |
-| **音色选择**（内置 5 个 2.0 音色） | ✅ 人设页「她的声音」 |
-| 错误日志落盘 + 前端崩溃上报 | ✅ 轮转日志，含堆栈 |
-| 版本单一真源 + 系统信息接口 | ✅ `GET /v1/system/info` |
-| 跨端地基（ulid、outbox、设备标识） | ✅ 迁移 `0021_sync_fields` |
-| 管理员：角色、额度开关、统一模型配置（温度/top_p/思考等）、审计 | ✅ 真库与全链路验证（[说明](docs/管理员与系统设置.md)） |
-| 粉色恋爱主题 + 6 套预设 + 自定义主色 | ✅ 已应用（[说明](docs/一键启动.md)） |
-| 一键启动：双击脚本、自动开页 | ✅ 实测页面与接口同源可用（[说明](docs/一键启动.md)） |
-| 前端（H5）：伴侣/创建/对话/记忆/演练/模型设置/登录 | ✅ 已联调（[说明](docs/前端说明.md)） |
-| HTTP API（模型只读接口、健康检查） | ✅ 可用 |
-| DeepSeek 官方真实调用 | ✅ 已跑通（流式、JSON、缓存命中、延迟与成本已实测） |
-| **语速调节、开口打断** | ⏳ 近期（见[待办真源](docs/roadmap/0003-development-plan.md)） |
-| **Tauri 打包、自动更新下载** | ⏳ V1.3 |
-| 向量召回、断线续传、App 壳、手机端同步 | ⏳ V2.0 |
+创建属于你的伴侣，和她长期对话、积累记忆、做场景演练。她的人设可以随时调整，改坏了能回退；你的所有对话都不会离开这台电脑。
 
-> 设计文档在 `docs/`：总体计划、后端与架构、前端方案、模型接入方案、修订说明。
+**不收费 · 不联网托管 · 无需注册**
 
-## 目录结构
+![首页](docs/images/screenshot-home.png)
 
-```
-backend/            FastAPI 后端（app/ 业务，alembic/ 迁移，tests/ 测试）
-frontend/           前端 H5（React 19 + TS + Vite，端口 5273）
-docker/             docker-compose：Postgres(pgvector) + Redis + MinIO + API + Web
-scripts/            PowerShell 开发脚本（安装、测试、起前后端）
-docs/               方案、接口与实测文档
-```
+---
 
-## 快速开始（Windows PowerShell 7）
+## 这是什么
 
-### 普通用户：双击启动
+市面上的 AI 陪伴产品大多把对话存在别人的服务器上，收费、限流、随时可能关停。这个项目走另一条路：
 
-1. 打开项目文件夹；
-2. 双击 **`启动AI伴侣.bat`**；
-3. 浏览器自动打开 `http://127.0.0.1:8000/`；
-4. **先用手机号 + 验证码登录**（开发模式验证码直接显示），再创建伴侣。
+| | 常见 SaaS | 本项目 |
+|---|---|---|
+| 数据存放 | 厂商服务器 | **你自己的电脑** |
+| 登录 | 手机号 / 邮箱 | **不需要**（本地单用户） |
+| 费用 | 订阅制 | **免费**（只付模型 API 成本） |
+| 模型 | 厂商绑定 | **9 家供应商可换**，支持本地模型 |
+| 关闭服务 | 数据消失 | **数据还在**，随时再开 |
 
-关闭窗口即停止服务。详细说明见 [一键启动](docs/一键启动.md)。
+代价是：你需要自己准备一个模型 API Key（默认用 DeepSeek，成本约每轮几分钱），并且需要会双击一个 `.bat` 文件。
 
-> 之前未登录时创建的数据落在 `dev-user` 下，登录后不会自动出现。用迁移脚本转到你的账号：
-> `backend/.venv/Scripts/python.exe scripts/claim_user_data.py --phone 你的手机号`（需先登录一次）。
+---
 
-### 开发者：命令行
+## 核心特性
+
+**对话**
+- 流式输出，逐字显示，首字延迟约 2 秒
+- 她先开口：新会话自动生成符合人设和当前时间的开场白
+- 多行输入、消息复制/删除/重新生成、失败一键重试、加载更早历史
+- 长时间对话自动压缩，保留早期摘要
+
+**记忆**
+- 聊天中自动抽取关于你的信息（偏好、经历、约定）
+- 跨会话召回，可在界面上查看、删除
+- 可整体关闭；关闭后不再抽取也不再调用
+
+**人设**
+- 一句话生成 7 维人设，或从 5 类模板开始
+- **每个字段都能让 AI 帮你改**：用大白话说想怎么改，生成建议后确认才写入
+- 修改直接生效，会话/记忆/头像全部保留
+- **每次保存留一个版本，最多 20 个，可随时还原**（还原也会留版本，可撤销）
+- 头像上传 + 裁剪，带实时预览
+
+**语音**
+- 说话转文字（VAD 自动判断说完），可切换麦克风设备
+- 她说话：流式分段合成，第一句就开始播，不用等整段
+- 5 个内置音色可选
+
+**场景演练**
+- 5 个预设场景（面试、拒绝、道歉等），AI 扮演对方
+- 结束后跳出角色给复盘：评分、亮点、改进建议
+
+**安全**
+- 内容底线硬编码：未成年、非自愿、违法等一律拦截
+- 危机词识别 + 求助资源提示
+- 供应商 Key 信封加密落库，接口只回掩码
+
+---
+
+## 快速开始
+
+### 前置条件
+
+- Windows 10/11
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)（跑数据库）
+- 一个模型 API Key（默认 DeepSeek，[申请地址](https://platform.deepseek.com/)）
+
+### 三步启动
 
 ```powershell
-# 1) 环境变量：复制模板并按需填写（至少填 AI_COMPANION_MASTER_KEY 与 DeepSeek Key）
+# 1) 复制配置模板，填入你的 Key
 Copy-Item .env.example .env
+# 用记事本打开 .env，至少填这两项：
+#   AI_COMPANION_MASTER_KEY=<32 字节 base64，用于加密供应商 Key>
+#   AI_COMPANION_DEEPSEEK_API_KEY=<你的 DeepSeek Key>
 
-# 2) 一键准备并起服务
-./scripts/dev.ps1
+# 2) 双击项目根目录的「启动AI伴侣.bat」
+#    首次会自动装依赖、起数据库、跑迁移、构建前端
 
-# 或者手动：
-python -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e "backend[dev]"
-docker compose -f docker/docker-compose.yml up -d postgres redis
-Push-Location backend; .venv/Scripts/python.exe -m alembic upgrade head; Pop-Location
-Push-Location backend; .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000; Pop-Location
+# 3) 浏览器自动打开 http://127.0.0.1:8000/
 ```
 
-打开 `http://127.0.0.1:8000/docs` 可看接口文档；前端生产构建由后端在 `http://127.0.0.1:8000/` 直接托管。
-
-## 前端
-
-生产/日常使用：双击 `启动AI伴侣.bat`，由后端托管构建产物（`http://127.0.0.1:8000/`）。
-
-开发调试（热更新）：
+生成 `AI_COMPANION_MASTER_KEY` 的方法：
 
 ```powershell
-./scripts/dev-web.ps1
-# 或手动
-cd frontend
-pnpm install --registry=https://registry.npmmirror.com
-pnpm dev
+python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 ```
 
-打开 `http://127.0.0.1:5273`。开发期登录态默认用 `X-User-Id`（`dev-user`），也可用「登录」页走验证码；管理员手机号在 `.env` 的 `AI_COMPANION_ADMIN_PHONES` 配置。
+> **不需要注册、不需要登录。** 首次打开直接创建伴侣即可。
+
+关闭那个命令行窗口即停止服务。数据都还在，下次双击就能继续。
+
+---
+
+## 截图
+
+| 创建伴侣 | 编辑人设 |
+|---|---|
+| ![创建](docs/images/screenshot-create.png) | ![人设](docs/images/screenshot-persona.png) |
+
+---
 
 ## 配置
 
-所有配置走环境变量，前缀 `AI_COMPANION_`，见 [.env.example](.env.example)。
+所有配置走环境变量，前缀 `AI_COMPANION_`，完整清单见 [.env.example](.env.example)。
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
-| `AI_COMPANION_MASTER_KEY` | 供应商 Key 的信封加密主密钥（32 字节 base64） | 空（生产必须填） |
+| `AI_COMPANION_MASTER_KEY` | 供应商 Key 的信封加密主密钥（**生产必须填**） | 空 |
 | `AI_COMPANION_DEEPSEEK_API_KEY` | 默认模型的官方 Key | 空 |
-| `AI_COMPANION_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 是否允许本地模型地址（Ollama 等） | `false` |
 | `AI_COMPANION_TURN_COST_CAP_CNY` | 单轮成本上限，用于倒推上下文预算 | `0.02` |
 | `AI_COMPANION_LOCAL_MODE` | 本地单用户免登录模式 | `true` |
-| `AI_COMPANION_DEBUG_AUTH` | 允许 `X-User-Id` 头冒充用户（**仅供本地调试**） | `false` |
-| `AI_COMPANION_LISTEN_LAN` | 监听 `0.0.0.0` 允许手机访问（由启动脚本读取） | `false` |
-| `AI_COMPANION_CORS_ORIGINS` | 允许跨端访问的前端来源，逗号分隔 | 空（只允许同源） |
-| `AI_COMPANION_AUDIO_DIR` | 语音音频临时目录 | 空（系统临时目录） |
+| `AI_COMPANION_LISTEN_LAN` | 监听 `0.0.0.0`，允许手机局域网访问 | `false` |
+| `AI_COMPANION_CORS_ORIGINS` | 允许跨端访问的来源，逗号分隔 | 空 |
 
-> 手机端访问：把 `AI_COMPANION_LISTEN_LAN=true` 与 `AI_COMPANION_CORS_ORIGINS` 一起配好，用手机浏览器打开 `http://<电脑局域网IP>:8000`。
+**手机访问**：把 `AI_COMPANION_LISTEN_LAN=true` 和 `AI_COMPANION_CORS_ORIGINS` 一起配好，手机浏览器打开 `http://<电脑局域网IP>:8000`。前端已构建为 PWA，可「添加到主屏幕」。
 
-### 跨端与 PWA
+---
 
-前端已构建为可安装的 PWA，手机浏览器打开后可「添加到主屏幕」，以独立窗口运行：
-
-| 能力 | 说明 |
-|---|---|
-| 离线壳 | 静态资源由 Service Worker 预缓存，断网时界面仍能打开 |
-| 接口不走缓存 | 所有 `/v1/*` 请求强制 `NetworkOnly`，避免读到过期数据 |
-| 设备标识 | 首次打开生成 ULID 存本地，随请求头发送，用于跨端来源判定 |
-| API 基地址 | 可用 `VITE_API_BASE` 指定后端地址（默认同源） |
-
-构建前端时如需指向别的后端：
+## 开发
 
 ```powershell
+# 后端
+cd backend
+.venv/Scripts/python.exe -m pytest -p no:cacheprovider     # 446 passed, 1 skipped
+.venv/Scripts/python.exe -m ruff check app tests           # 静态检查
+
+# 前端
 cd frontend
-$env:VITE_API_BASE = "http://192.168.1.10:8000"
-pnpm build
+pnpm build        # tsc + vite build
+pnpm lint         # eslint
+pnpm test         # 纯逻辑单测
+pnpm test:page    # 页面验收（需后端在 8000 运行）
 ```
 
-## 验证
+**技术栈**
 
-```powershell
-./scripts/test.ps1
-# 等价于：
-Push-Location backend; .venv/Scripts/python.exe -m pytest -q; Pop-Location
-```
-
-测试覆盖：定价/预算公式、token 估算与裁剪、消息裁剪、SSE 解析与错误映射、路由降级与中断语义、
-注册表预设、密钥加密、SSRF 防护、调用记账、HTTP 接口。
-
-## 备份与恢复
-
-数据库里是你的全部伴侣、会话、记忆与设置。升级或换机前先备份：
-
-```powershell
-# 备份到文件（默认 tmp/backup.json，约几百 KB）
-backend/.venv/Scripts/python.exe scripts/backup_db.py --out tmp/backup.json
-
-# 恢复（会清空现有数据，必须加 --yes）
-backend/.venv/Scripts/python.exe scripts/backup_db.py --restore tmp/backup.json --yes
-```
-
-| 项 | 说明 |
+| 层 | 选型 |
 |---|---|
-| 备份内容 | 全部业务表：伴侣、人设版本、会话、消息、记忆、摘要、演练、供应商配置等 |
-| 不备份 | 登录会话、短信验证码、调用流水、埋点、同步队列——这些属于运行期状态 |
-| 兼容性 | 备份文件带 `format` 与 `version`；版本不一致会拒绝恢复，避免写坏数据 |
-| 依赖 | 纯 Python 直连，**不需要装 pg_dump** |
-| 恢复顺序 | 按外键依赖自动排序（父表先写），不会因约束冲突失败 |
+| 后端 | Python 3.12 + FastAPI + SQLAlchemy 2 (async) + Alembic |
+| 数据库 | PostgreSQL 16 + pgvector |
+| 前端 | React 19 + TypeScript + Vite 6 + React Router 7 |
+| 样式 | 手写 CSS + 主题变量（不引重型 UI 库） |
+| 数据层 | TanStack Query |
+| 表单 | react-hook-form + zod（字段约束由后端 Pydantic 生成） |
 
-## 数据导入（换机迁移）
+**目录结构**
 
-```powershell
-# 1. 旧机器导出
-curl "http://127.0.0.1:8000/v1/me/export" -o export.json
-
-# 2. 新机器导入（PowerShell）
-Invoke-RestMethod "http://127.0.0.1:8000/v1/me/import" -Method Post -ContentType "application/json" -InFile export.json
+```
+backend/            FastAPI 后端
+  app/domain/       业务语义唯一 owner（规则、校验、状态流转）
+  app/api/          协议映射，不写业务判断
+  app/infra/        仓储、外部调用、加密
+  tests/            pytest
+frontend/           React 前端
+  src/pages/        页面
+  src/components/   可复用组件
+  tests/            Playwright 页面验收
+docs/               ADR、规格、交付说明
+scripts/            启动与契约生成脚本
 ```
 
-| 项 | 规则 |
-|---|---|
-| 去重单位 | **伴侣 ULID** |
-| 重复处理 | 已存在的伴侣整棵子树跳过，**不覆盖**现有数据 |
-| 返回报告 | `created` 新建 / `skipped` 跳过 / `failed` 逐项原因 |
-| 单项失败 | 不中断整包，其余照常导入 |
-| 版本校验 | 文件 `version` 高于当前支持值时拒绝，避免写入不认识的字段 |
+---
 
-## 查询用量（真实调用落库后）
-
-```powershell
-# 启动服务后：
-Invoke-RestMethod "http://127.0.0.1:8000/v1/me/usage/models?days=7" -Headers @{ "X-User-Id" = "dev-user" }
-```
-
-返回按模型的调用次数、输入/输出 token、缓存命中率、成本（元）与首字延迟均值，以及按天汇总。
-`X-User-Id` 只是开发期占位，生产必须关闭 `AI_COMPANION_DEBUG_AUTH` 并接真实登录。
-
-## 关键约定
-
-- **模型网关统一接口**：业务只调 `ModelRouter.stream(task, messages)`，换供应商不改业务代码。
-- **首 token 后不降级**：断流只允许续写/重新生成；内容拦截不换供应商（否则等于绕过审核）。
-- **Key 永不回明文**：接口只回掩码，日志不含 Key，密文带防篡改校验。
-- **上下文预算由成本倒推**：1M 窗口不等于默认塞满；默认经济档 16K。
-
-## 文档索引
-
-### 决策与规格
+## 文档
 
 | 类型 | 位置 | 说明 |
 |---|---|---|
-| 术语表 | [GLOSSARY.md](GLOSSARY.md) | 全项目唯一术语真源，新概念先在此登记 |
-| 架构决策 | [docs/adr/](docs/adr/) | 0001–0020，主体 0001–0013，语音 0014–0019，人设原地编辑 0020（取代 0001） |
-| 功能规格 | [docs/specs/](docs/specs/) | 0001 首次体验、0002 语音对话 |
-| 工单 | [docs/tickets/](docs/tickets/) | 0001 P0 首批、0002 语音 |
-| **待办与优先级** | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | **全项目待办真源**：已完成、待办、已知债务、非目标、基线 |
-| 前端界面待办 | [docs/roadmap/0004-前端界面待办.md](docs/roadmap/0004-前端界面待办.md) | 前端界面范围的三份旧清单合并版（49 条待办、7 个批次） |
+| 术语表 | [GLOSSARY.md](GLOSSARY.md) | 全项目唯一术语真源 |
+| 架构决策 | [docs/adr/](docs/adr/) | 0001–0020，含关键取舍的原因 |
+| 待办与优先级 | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | 当前待办真源 |
+| 前端界面待办 | [docs/roadmap/0004-前端界面待办.md](docs/roadmap/0004-前端界面待办.md) | 界面范围清单 |
+| 能力说明 | [docs/](docs/) | 对话、记忆、语音、演练等各能力细节 |
 
-### 能力说明（当前有效）
+---
 
-| 文档 | 覆盖 |
+## 贡献
+
+欢迎提 Issue 和 PR。提交前请：
+
+1. 跑通 `pytest` 和 `pnpm build`
+2. 遵循 [CONTRIBUTING.md](CONTRIBUTING.md)（一次只解决一个问题，不要把重构和功能混在一起）
+3. 安全相关问题请看 [SECURITY.md](SECURITY.md)，**不要公开提 Issue**
+
+---
+
+## 已知限制
+
+| 项 | 现状 |
 |---|---|
-| [人设Schema与伴侣接口.md](docs/人设Schema与伴侣接口.md) | 人设 7 维字段、伴侣 CRUD、衍生 |
-| [对话接口与SSE.md](docs/对话接口与SSE.md) | 会话、消息、流式事件 |
-| [记忆与上下文.md](docs/记忆与上下文.md) | 自动抽取、召回、总开关 |
-| [上下文压缩.md](docs/上下文压缩.md) | 预算裁剪、早期摘要 |
-| [演练与安全.md](docs/演练与安全.md) | 场景、扮演、复盘 |
-| [额度与内容安全.md](docs/额度与内容安全.md) | 用量控制与内容边界 |
-| [内容边界与成年模式.md](docs/内容边界与成年模式.md) | 底线清单与开关 |
-| [伴侣头像与人设忠实度.md](docs/伴侣头像与人设忠实度.md) | 头像裁剪、人设忠实度 |
-| [删除与数据清理.md](docs/删除与数据清理.md) | 软删、墓碑、硬清 |
-| [前端说明.md](docs/前端说明.md) | 页面结构、主题、构建 |
-| [一键启动.md](docs/一键启动.md) | 双击启动与排障 |
-| [登录与账号.md](docs/登录与账号.md) | 手机验证码登录（多用户模式） |
-| [管理员与系统设置.md](docs/管理员与系统设置.md) | 参数覆盖与审计 |
-| [用户身份.md](docs/用户身份.md) | 通用身份与伴侣级覆盖 |
-| [本地单用户模式.md](docs/本地单用户模式.md) | 免登录、数据归本机 |
-| [供应商配置.md](docs/供应商配置.md) | API Key 配置、加密、热更新 |
-| [模型搜索与导入.md](docs/模型搜索与导入.md) | 拉取供应商模型、导入注册表 |
-| [模型下拉过滤.md](docs/模型下拉过滤.md) | 只显示已配置供应商的模型 |
-| [语音功能.md](docs/语音功能.md) | 语音识别、合成、音色、配置教程 |
-| [跨端地基-第1批.md](docs/跨端地基-第1批.md) | CORS、同步字段、导出标识、outbox |
+| 平台 | 目前只支持 Windows（启动脚本是 PowerShell） |
+| 分发 | 需要命令行启动，暂未打包成安装程序 |
+| 手机端 | PWA 可用，但未在真机做完整验证 |
+| 同步 | 跨设备同步的字段已备好，服务未实现 |
+| 语速调节 / 开口打断 | 已排期，尚未实现 |
+| 深色模式 | 未实现 |
 
-### 历史归档
+---
 
-一次性测试报告与阶段交付说明已移到 [docs/archive/](docs/archive/)，**非当前真源**，只作历史参考。
+## 许可
 
-### 规划与总体方案
+[MIT](LICENSE)
 
-| 文档 | 覆盖 |
-|---|---|
-| [AI伴侣系统V1.0_产品与技术实施计划.md](docs/AI伴侣系统V1.0_产品与技术实施计划.md) | V1.0 总体实施计划 |
-| [AI伴侣系统V1.0_后端与整体架构方案.md](docs/AI伴侣系统V1.0_后端与整体架构方案.md) | 后端分层与整体架构 |
-| [AI伴侣系统V1.0_模型接入与多供应商方案.md](docs/AI伴侣系统V1.0_模型接入与多供应商方案.md) | 模型层与供应商接入设计 |
-| [四项新能力_后端设计方案.md](docs/四项新能力_后端设计方案.md) | P0.5 四项能力设计 |
-| [修订说明-v1.1.md](docs/修订说明-v1.1.md) | V1.1 变更说明 |
-| [V1.1_开发优先级排序_与第一批开工清单.md](docs/V1.1_开发优先级排序_与第一批开工清单.md) | V1.1 优先级与开工清单 |
-| [V1.1_UI重设计与四项功能_项目计划.md](docs/V1.1_UI重设计与四项功能_项目计划.md) | V1.1 UI 重设计计划 |
-| [V1.2_产品体验体检与新阶段立项.md](docs/V1.2_产品体验体检与新阶段立项.md) | V1.2 立项与体验体检 |
-| [V1.2_首批快赢.md](docs/V1.2_首批快赢.md) | V1.2 首批快赢项 |
-| [V1.2_第二批.md](docs/V1.2_第二批.md) | V1.2 第二批规划 |
+---
 
+## 免责声明
+
+本项目面向**成年人**的虚构陪伴场景。所有伴侣均为 AI 生成的虚构角色，不对应任何真实人物。
+
+请勿用于：冒充真实人物、生成违法内容、骚扰他人。
+
+如果你正在经历心理危机，请联系专业帮助：全国心理援助热线 **12356**，紧急情况拨打 **120**。
