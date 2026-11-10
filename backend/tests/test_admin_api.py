@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.domain.auth import InMemoryAuthRepository
 from app.domain.system_settings import InMemorySystemSettingsRepository
-from tests.support import build_test_app
+from app.testing import build_test_app
 
 
 def build_client(

@@ -10,7 +10,7 @@ from app.domain.persona import Persona
 from app.domain.templates import TEMPLATES, InMemoryTemplateRepository
 from app.domain.usage import CallContext
 from app.infra.llm.types import ChatChunk, Usage
-from tests.support import build_test_app
+from app.testing import build_test_app
 
 PERSONA = Persona.model_validate(
     {

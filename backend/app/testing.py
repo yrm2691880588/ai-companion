@@ -9,8 +9,11 @@ Actions）没有数据库，同一个测试就会失败——本地环境把缺�
 这个工厂把所有仓储显式传成内存版，让测试不依赖任何外部服务。
 新增仓储时请同步加到这里，否则该仓储仍会去连真实库。
 
+放在 app/ 下而不是 tests/ 下：tests/ 不是包，CI 上 `from tests.support`
+会报 ModuleNotFoundError；app 是正式包，任何环境都能导入。
+
 用法：
-    from tests.support import build_test_app
+    from app.testing import build_test_app
     app = build_test_app()
     app = build_test_app(settings=Settings(local_mode=False))
 """
