@@ -208,6 +208,18 @@ def create_app(
         else Path(tempfile.gettempdir()) / "ai-companion-audio"
     )
     audio_store = AudioStore(audio_root)
+    # 启动时先清一次上次残留的语音临时文件。
+    #
+    # 为什么需要：save() 里已经会清理，但那只在「合成语音时」触发。
+    # 用户合成一次就关闭后端，那个文件就永远留着——下次启动也不会清，
+    # 一直堆到下一次合成才被扫掉。
+    # 放在这里而不是关闭钩子：用户可能直接关窗口/杀进程/断电，
+    # 关闭钩子根本跑不到；启动钩子每次必定执行。
+    # 清理失败不能拦住启动（例如目录被占用），所以只记日志。
+    try:
+        _LOG.info("启动清理语音临时文件：移除 %d 个", audio_store.cleanup())
+    except Exception:  # noqa: BLE001
+        _LOG.warning("启动清理语音临时文件失败", exc_info=True)
     system_settings = SystemSettingsService(settings_store)
     quota_enforced, quota_limit = system_settings.quota_config()
     quota_service = QuotaService(quotas_store, daily_limit=quota_limit, enforced=quota_enforced)

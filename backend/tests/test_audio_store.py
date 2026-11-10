@@ -72,3 +72,40 @@ def test_cleanup_reports_count(tmp_path: Path) -> None:
         old = time.time() - 7200
         os.utime(path, (old, old))
     assert store.cleanup() == 3
+
+
+def test_startup_cleanup_removes_leftovers(tmp_path: Path) -> None:
+    """启动时清理上次残留。
+
+    场景：用户合成一次语音就关闭后端，那个文件不会被 save 清理到
+    （save 只在合成时触发）。下次启动必须把它清掉，
+    否则会一直堆着，直到下一次合成。
+    """
+    from app.core.config import Settings
+    from app.main import create_app
+
+    stale = tmp_path / "leftover.mp3"
+    stale.write_bytes(b"old")
+    old = time.time() - 7200
+    os.utime(stale, (old, old))
+
+    create_app(
+        Settings(env="test", audio_dir=str(tmp_path), _env_file=None)  # type: ignore[call-arg]
+    )
+
+    assert not stale.exists(), "启动时应清理上次残留"
+
+
+def test_startup_cleanup_keeps_recent_files(tmp_path: Path) -> None:
+    """启动清理不能误删刚生成、可能还在播的文件。"""
+    from app.core.config import Settings
+    from app.main import create_app
+
+    fresh = tmp_path / "playing.mp3"
+    fresh.write_bytes(b"recent")
+
+    create_app(
+        Settings(env="test", audio_dir=str(tmp_path), _env_file=None)  # type: ignore[call-arg]
+    )
+
+    assert fresh.exists(), "刚生成的文件不应被启动清理删掉"
