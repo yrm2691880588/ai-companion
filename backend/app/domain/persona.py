@@ -141,7 +141,6 @@ def prompt_tokens(persona: Persona) -> int:
 DIMENSION_META: list[dict[str, Any]] = [
     {
         "key": "name",
-
         "refinable": False,
         "label": "名字",
         "type": "text",
@@ -151,7 +150,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "identity",
-
         "refinable": True,
         "label": "身份",
         "type": "text",
@@ -161,7 +159,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "gender",
-
         "refinable": False,
         "label": "性别",
         "type": "select",
@@ -170,7 +167,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "age",
-
         "refinable": False,
         "label": "年龄",
         "type": "number",
@@ -180,7 +176,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "personality",
-
         "refinable": True,
         "label": "性格特质",
         "type": "list",
@@ -191,7 +186,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "speaking_style",
-
         "refinable": True,
         "label": "说话风格",
         "type": "textarea",
@@ -201,7 +195,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "background",
-
         "refinable": True,
         "label": "背景设定",
         "type": "textarea",
@@ -211,7 +204,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "tags",
-
         "refinable": True,
         "label": "核心标签",
         "type": "list",
@@ -222,7 +214,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "relationship",
-
         "refinable": True,
         "label": "关系定位",
         "type": "text",
@@ -232,7 +223,6 @@ DIMENSION_META: list[dict[str, Any]] = [
     },
     {
         "key": "example_openers",
-
         "refinable": True,
         "label": "示例开场白",
         "type": "list",

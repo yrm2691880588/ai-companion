@@ -101,16 +101,12 @@ async def list_persona_versions(
     """人设的历史版本，最新的在前。"""
     versions = await service.list_persona_versions(user_id, companion_id)
     return [
-        PersonaVersionOut(
-            version=item.version, persona=item.persona, created_at=item.created_at
-        )
+        PersonaVersionOut(version=item.version, persona=item.persona, created_at=item.created_at)
         for item in versions
     ]
 
 
-@router.post(
-    "/{companion_id}/personas/{version}/restore", response_model=CompanionOut
-)
+@router.post("/{companion_id}/personas/{version}/restore", response_model=CompanionOut)
 async def restore_persona_version(
     companion_id: int,
     version: int,

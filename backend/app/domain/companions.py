@@ -129,9 +129,7 @@ class CompanionRepository(Protocol):
         self, user_id: str, companion_id: int, version: int
     ) -> PersonaVersionRecord | None: ...
 
-    async def prune_versions(
-        self, user_id: str, companion_id: int, keep: int
-    ) -> int: ...
+    async def prune_versions(self, user_id: str, companion_id: int, keep: int) -> int: ...
 
     async def soft_delete(self, user_id: str, companion_id: int) -> bool: ...
 
@@ -180,9 +178,7 @@ class InMemoryCompanionRepository:
         self._items[record.id] = record
         # 创建即 v1：历史列表里要有起点，否则「还原到最初」无从下手
         self._versions[record.id] = [
-            PersonaVersionRecord(
-                version=1, persona=persona, created_at=datetime.now(UTC)
-            )
+            PersonaVersionRecord(version=1, persona=persona, created_at=datetime.now(UTC))
         ]
         self._next_id += 1
         return record
@@ -226,14 +222,10 @@ class InMemoryCompanionRepository:
         )
         return item
 
-    async def list_versions(
-        self, user_id: str, companion_id: int
-    ) -> list[PersonaVersionRecord]:
+    async def list_versions(self, user_id: str, companion_id: int) -> list[PersonaVersionRecord]:
         if await self.get(user_id, companion_id) is None:
             return []
-        return sorted(
-            self._versions.get(companion_id, []), key=lambda v: v.version, reverse=True
-        )
+        return sorted(self._versions.get(companion_id, []), key=lambda v: v.version, reverse=True)
 
     async def get_version(
         self, user_id: str, companion_id: int, version: int

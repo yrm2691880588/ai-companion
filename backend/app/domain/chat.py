@@ -597,9 +597,7 @@ class ChatService:
         # 只有「用户消息存在但内容对不上」才视为冲突。
         user_message = None
         if client_request_id:
-            duplicated = await self._repo.find_by_request(
-                user_id, session_id, client_request_id
-            )
+            duplicated = await self._repo.find_by_request(user_id, session_id, client_request_id)
             if duplicated is not None:
                 if duplicated.content.strip() != text:
                     # 同一个 ID 配上不同内容，说明客户端复用 ID 出错了

@@ -160,9 +160,7 @@ class SqlCompanionRepository:
                 updated_at=companion.updated_at,
             )
 
-    async def list_versions(
-        self, user_id: str, companion_id: int
-    ) -> list[PersonaVersionRecord]:
+    async def list_versions(self, user_id: str, companion_id: int) -> list[PersonaVersionRecord]:
         """按版本号倒序返回历史人设（最新的在前）。"""
         async with self._session_factory() as session:
             owned = (
@@ -177,12 +175,16 @@ class SqlCompanionRepository:
             if owned is None:
                 return []
             rows = (
-                await session.execute(
-                    select(CompanionPersona)
-                    .where(CompanionPersona.companion_id == companion_id)
-                    .order_by(CompanionPersona.version.desc())
+                (
+                    await session.execute(
+                        select(CompanionPersona)
+                        .where(CompanionPersona.companion_id == companion_id)
+                        .order_by(CompanionPersona.version.desc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         return [
             PersonaVersionRecord(
                 version=row.version,
@@ -244,12 +246,16 @@ class SqlCompanionRepository:
             if owned is None:
                 return 0
             versions = (
-                await session.execute(
-                    select(CompanionPersona.version)
-                    .where(CompanionPersona.companion_id == companion_id)
-                    .order_by(CompanionPersona.version.desc())
+                (
+                    await session.execute(
+                        select(CompanionPersona.version)
+                        .where(CompanionPersona.companion_id == companion_id)
+                        .order_by(CompanionPersona.version.desc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             if len(versions) <= keep:
                 return 0
             stale = versions[keep:]
