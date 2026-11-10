@@ -2,7 +2,6 @@ import { chromium } from "playwright";
 import { writeFileSync } from "node:fs";
 
 const BASE = "http://127.0.0.1:8000";
-const PHONE = "TEST_PHONE_REDACTED";
 
 const results = [];
 function check(name, ok, detail = "") {

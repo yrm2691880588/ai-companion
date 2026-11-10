@@ -3,17 +3,30 @@ import { pickAnyCompanion } from "./lib/fixtures.mjs";
 
 const BASE = "http://127.0.0.1:8000";
 
+/**
+ * 登录用的手机号从环境变量读，不写进代码。
+ *
+ * 为什么：这会随仓库公开，而真实手机号一旦提交，即使之后删掉，
+ * Git 历史里仍然留着。跑这套验收前先设：
+ *   $env:AI_COMPANION_TEST_PHONE="你的号码"
+ */
+const PHONE = process.env.AI_COMPANION_TEST_PHONE ?? "";
+if (!PHONE) {
+  console.error("缺少 AI_COMPANION_TEST_PHONE 环境变量（用于登录的测试手机号）");
+  process.exit(1);
+}
+
 async function loginCookie() {
   const codeResp = await fetch(`${BASE}/v1/auth/sms-code`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone: "TEST_PHONE_REDACTED" }),
+    body: JSON.stringify({ phone: PHONE }),
   });
   const { debug_code } = await codeResp.json();
   const loginResp = await fetch(`${BASE}/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone: "TEST_PHONE_REDACTED", code: debug_code }),
+    body: JSON.stringify({ phone: PHONE, code: debug_code }),
   });
   const cookie = loginResp.headers.get("set-cookie") || "";
   return cookie.match(/ac_session=([^;]+)/)[1];
