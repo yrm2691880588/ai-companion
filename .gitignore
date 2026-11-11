@@ -51,3 +51,8 @@ frontend/public/vad/
 # 语音合成音频临时目录
 ai-companion-audio/
 
+
+# 开发过程文档：不公开（本地保留，只是不再提交）
+# 包含内部规划、待办、体检报告、交付记录等，不适合出现在公开仓库。
+# 公开的只有 architecture/（架构决策）和 screenshots/（README 截图）。
+docs/

@@ -15,7 +15,7 @@
 
 **不收费 · 不联网托管 · 无需注册**
 
-![首页](docs/images/screenshot-home.png)
+![首页](screenshots/home.png)
 
 ---
 
@@ -110,7 +110,7 @@ python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 
 | 创建伴侣 | 编辑人设 |
 |---|---|
-| ![创建](docs/images/screenshot-create.png) | ![人设](docs/images/screenshot-persona.png) |
+| ![创建](screenshots/create.png) | ![人设](screenshots/persona.png) |
 
 ---
 
@@ -170,7 +170,8 @@ frontend/           React 前端
   src/pages/        页面
   src/components/   可复用组件
   tests/            Playwright 页面验收
-docs/               ADR、规格、交付说明
+architecture/       架构决策记录（ADR）
+screenshots/        README 用截图
 scripts/            启动与契约生成脚本
 ```
 
@@ -180,11 +181,9 @@ scripts/            启动与契约生成脚本
 
 | 类型 | 位置 | 说明 |
 |---|---|---|
-| 术语表 | [GLOSSARY.md](GLOSSARY.md) | 全项目唯一术语真源 |
-| 架构决策 | [docs/adr/](docs/adr/) | 0001–0020，含关键取舍的原因 |
-| 待办与优先级 | [docs/roadmap/0003-development-plan.md](docs/roadmap/0003-development-plan.md) | 当前待办真源 |
-| 前端界面待办 | [docs/roadmap/0004-前端界面待办.md](docs/roadmap/0004-前端界面待办.md) | 界面范围清单 |
-| 能力说明 | [docs/](docs/) | 对话、记忆、语音、演练等各能力细节 |
+| 架构决策 | [architecture/](architecture/) | 20 份 ADR，记录关键取舍的原因（为什么这样设计） |
+| 术语表 | [GLOSSARY.md](GLOSSARY.md) | 全项目统一术语 |
+| 变更记录 | [CHANGELOG.md](CHANGELOG.md) | 版本演进 |
 
 ---
 
