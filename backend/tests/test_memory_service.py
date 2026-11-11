@@ -82,9 +82,7 @@ async def test_extract_dedupes_near_duplicates() -> None:
     # 例子用中性的「开会」，不关联任何具体公司或场合。
     # 相似度阈值 0.75，这两句的 bigram 重叠率是 1.00。
     first = payload({"type": "promise", "content": "明天上午要开会", "confidence": 0.9})
-    second = payload(
-        {"type": "promise", "content": "明天上午要开会讨论", "confidence": 0.9}
-    )
+    second = payload({"type": "promise", "content": "明天上午要开会讨论", "confidence": 0.9})
     repo = InMemoryMemoryRepository()
     service = MemoryService(repo, FakeLLM([first, second]))
     await service.extract("u1", 1, 1, [("user", "明天上午要开会")], "r1")
