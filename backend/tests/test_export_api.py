@@ -30,9 +30,9 @@ MEMORY_JSON = json.dumps(
         "items": [
             {
                 "type": "promise",
-                "content": "下周五要去字节面试",
+                "content": "下周五要去参加行业会议",
                 "confidence": 0.9,
-                "quote": "我下周五要去字节面试",
+                "quote": "我下周五要去参加行业会议",
             }
         ]
     },
@@ -81,7 +81,7 @@ def test_export_contains_companion_sessions_messages_and_memories() -> None:
     assert exported["persona"]["identity"] == "心理学研究生"
     assert len(exported["sessions"]) == 1
     assert len(exported["sessions"][0]["messages"]) == 2
-    assert exported["memories"][0]["content"] == "下周五要去字节面试"
+    assert exported["memories"][0]["content"] == "下周五要去参加行业会议"
 
 
 def test_export_does_not_leak_other_users() -> None:

@@ -47,9 +47,9 @@ async def test_extract_creates_valid_items() -> None:
             payload(
                 {
                     "type": "promise",
-                    "content": "下周五要去字节面试",
+                    "content": "下周五要去参加行业会议",
                     "confidence": 0.9,
-                    "quote": "我下周五要去字节面试",
+                    "quote": "我下周五要去参加行业会议",
                 },
                 {
                     "type": "preference",
@@ -62,7 +62,7 @@ async def test_extract_creates_valid_items() -> None:
     )
     repo = InMemoryMemoryRepository()
     service = MemoryService(repo, llm)
-    created = await service.extract("u1", 1, 1, [("user", "我下周五要去字节面试")], "r1")
+    created = await service.extract("u1", 1, 1, [("user", "我下周五要去参加行业会议")], "r1")
     assert len(created) == 2
     assert created[0].type == "promise"
     assert created[0].confidence == 0.9
@@ -78,14 +78,17 @@ async def test_extract_dedupes_same_content() -> None:
 
 
 async def test_extract_dedupes_near_duplicates() -> None:
-    first = payload({"type": "promise", "content": "下周五要去字节面试", "confidence": 0.9})
+    # 两条记忆讲同一件事、措辞略长，应该只保留一条。
+    # 例子用中性的「开会」，不关联任何具体公司或场合。
+    # 相似度阈值 0.75，这两句的 bigram 重叠率是 1.00。
+    first = payload({"type": "promise", "content": "明天上午要开会", "confidence": 0.9})
     second = payload(
-        {"type": "promise", "content": "用户下周五要去字节跳动面试", "confidence": 0.9}
+        {"type": "promise", "content": "明天上午要开会讨论", "confidence": 0.9}
     )
     repo = InMemoryMemoryRepository()
     service = MemoryService(repo, FakeLLM([first, second]))
-    await service.extract("u1", 1, 1, [("user", "下周五要去字节面试")], "r1")
-    created = await service.extract("u1", 1, 2, [("user", "下周五要去字节跳动面试")], "r2")
+    await service.extract("u1", 1, 1, [("user", "明天上午要开会")], "r1")
+    created = await service.extract("u1", 1, 2, [("user", "明天上午要开会讨论")], "r2")
     assert created == []
 
 
@@ -160,7 +163,7 @@ async def test_recall_prefers_promise_and_overlap() -> None:
         "u1",
         1,
         type="promise",
-        content="下周五要去字节面试",
+        content="下周五要去参加行业会议",
         confidence=0.9,
         quote=None,
         source_session_id=1,
@@ -230,7 +233,9 @@ def test_format_for_prompt_includes_labels() -> None:
 
 def test_helpers() -> None:
     assert normalize_content("我 喜欢，冰美式。") == "我喜欢冰美式"
-    assert overlap_ratio("明天面试", "下周五要去字节面试") > 0
+    # 意图是「两句有共同词时相似度 > 0」。
+    # 用中性的例子，不关联任何具体公司或场合。
+    assert overlap_ratio("明天要开会", "明天上午有个会") > 0
     assert is_sensitive("我住在朝阳区", None) is True
     assert is_sensitive("我住在朝阳区", "记住这个") is False
 

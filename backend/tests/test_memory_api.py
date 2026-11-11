@@ -30,9 +30,9 @@ MEMORY_JSON = json.dumps(
         "items": [
             {
                 "type": "promise",
-                "content": "下周五要去字节面试",
+                "content": "下周五要去参加行业会议",
                 "confidence": 0.9,
-                "quote": "我下周五要去字节面试",
+                "quote": "我下周五要去参加行业会议",
             }
         ]
     },
@@ -72,7 +72,7 @@ def prepare_session(test_client: TestClient) -> tuple[int, int]:
     test_client.put(f"/v1/companions/{companion['id']}/memory-settings", json={"enabled": False})
     session = test_client.post(f"/v1/companions/{companion['id']}/sessions", json={}).json()
     test_client.post(
-        f"/v1/sessions/{session['id']}/messages", json={"content": "我下周五要去字节面试"}
+        f"/v1/sessions/{session['id']}/messages", json={"content": "我下周五要去参加行业会议"}
     )
     return companion["id"], session["id"]
 

@@ -27,7 +27,7 @@ PERSONA = Persona.model_validate(
     }
 )
 
-SUMMARY_TEXT = "用户下周五要去字节面试，最近每天刷两道算法题，情绪偏紧张。"
+SUMMARY_TEXT = "用户下周五要去参加行业会议，最近每天刷两道算法题，情绪偏紧张。"
 
 
 class FakeLLM:
