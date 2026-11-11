@@ -56,3 +56,9 @@ ai-companion-audio/
 # 包含内部规划、待办、体检报告、交付记录等，不适合出现在公开仓库。
 # 公开的只有 architecture/（架构决策）和 screenshots/（README 截图）。
 docs/
+
+# AI 开发规则：本地工具配置，不属于项目内容
+# 已在 .git/info/exclude 里排除，这里再写一遍防止换机器后误提交
+/AGENTS.md
+/AGENTS.local.md
+/.agent-rules/
