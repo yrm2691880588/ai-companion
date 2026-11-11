@@ -51,7 +51,7 @@ class FakeMemory:
                 user_id=user_id,
                 companion_id=companion_id,
                 type="promise",
-                content="下周五要去字节面试",
+                content="下周五要去参加行业会议",
             )
         ]
 
@@ -78,13 +78,13 @@ async def test_recall_is_injected_into_system_prompt() -> None:
         pass
     assert memory.queries == ["明天面试好紧张"]
     system = streamer.calls[0][0]
-    assert "下周五要去字节面试" in system.content
+    assert "下周五要去参加行业会议" in system.content
     assert "# 你记得的事" in system.content
 
 
 async def test_remember_is_scheduled_after_reply() -> None:
     service, _, memory, _, session = await build()
-    async for _ in service.stream_reply("u1", session.id, "我下周五要去字节面试", "r1"):
+    async for _ in service.stream_reply("u1", session.id, "我下周五要去参加行业会议", "r1"):
         pass
     await asyncio.sleep(0)
     assert memory.remembered

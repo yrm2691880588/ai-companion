@@ -326,7 +326,7 @@ class MemoryService:
                 continue
             if await self._repo.find_duplicate(user_id, companion_id, memory_type, content):
                 continue
-            # 近似重复：同类型下与已有记忆高度重合就跳过（例如“字节面试”与“字节跳动面试”）
+            # 近似重复：同类型下与已有记忆高度重合就跳过（例如「明天要开会」与「明天有个会」）
             existing = await self._repo.list(user_id, companion_id, type=memory_type, limit=200)
             if any(
                 max(

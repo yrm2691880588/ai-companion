@@ -19,7 +19,7 @@ from app.infra.llm.types import ChatChunk, Usage
 
 PERSONA = Persona.model_validate(
     {
-        "name": "何静",
+        "name": "周敏",
         "identity": "HRBP",
         "gender": "女",
         "age": 32,
