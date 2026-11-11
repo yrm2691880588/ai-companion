@@ -10,7 +10,7 @@
 |---|---|
 | [README.md](README.md) | 项目定位、能力清单、快速开始 |
 | [GLOSSARY.md](GLOSSARY.md) | 术语真源；新概念必须先在此登记 |
-| [docs/adr/](docs/adr/) | 架构决策；已被决策过的事不要重开辩论 |
+| [architecture/](architecture/) | 架构决策（ADR）；已被决策过的事不要重开辩论 |
 
 ## 环境准备
 
@@ -88,7 +88,7 @@ pnpm install
 | 提交 `AGENTS.md`、`.agent-rules/` 等私人规则文件 | 那是维护者的私人工作偏好，不是项目资料 |
 | 用 `git add .` 一把梭 | 会带走未跟踪的临时文件 |
 | 提交 `frontend/dist/`、`node_modules/`、`__pycache__/` | 构建产物与依赖不入库 |
-| 擅自改内容边界底线 | 见 `docs/adr/0006`，这是产品红线 |
+| 擅自改内容边界底线 | 见 `architecture/0006-content-floor-stays.md`，这是产品红线 |
 | 在同一 PR 里顺手重构无关文件 | 评审成本会爆掉 |
 
 ## 提交信息

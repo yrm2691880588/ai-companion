@@ -1,0 +1,29 @@
+# 编辑器统一配置
+# 目的：不同编辑器/系统下缩进与换行一致，减少无意义的 diff。
+# 换行细节（Windows 脚本用 CRLF）由 .gitattributes 负责。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python：4 空格
+[*.py]
+indent_size = 4
+
+# Markdown 不做行尾空行裁剪：两个空格是换行的语义
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows 脚本必须 CRLF，否则 cmd.exe 可能解析异常
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# 锁文件不要动
+[{pnpm-lock.yaml,uv.lock}]
+insert_final_newline = false
